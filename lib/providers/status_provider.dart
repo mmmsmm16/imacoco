@@ -3,18 +3,16 @@ import 'package:flutter/foundation.dart';
 import '../models/user.dart';
 import '../models/user_status.dart';
 import '../repositories/status_repository.dart';
+import '../services/notification_service.dart';
 
 class StatusProvider extends ChangeNotifier {
   final StatusRepository _repository;
+  final NotificationService _notificationService = NotificationService();
   
   User? _currentUser;
   List<User> _friends = [];
   Timer? _autoResetTimer;
   StreamSubscription? _friendsSubscription;
-  
-  // Auto-reset duration (e.g., 1 hour)
-  // Making it shorter for testing purposes if needed, but keeping requirement of 1h
-  static const Duration _autoResetDuration = Duration(hours: 1);
 
   StatusProvider(this._repository) {
     _init();
@@ -23,7 +21,11 @@ class StatusProvider extends ChangeNotifier {
   User? get currentUser => _currentUser;
   List<User> get friends => _friends;
 
-  void _init() {
+  void _init() async {
+    // Initialize notification service
+    await _notificationService.init();
+    await _notificationService.requestPermissions();
+
     _friendsSubscription = _repository.friendsStream.listen((friends) {
       _friends = friends;
       notifyListeners();
@@ -52,25 +54,30 @@ class StatusProvider extends ChangeNotifier {
     );
     notifyListeners();
 
-    _startAutoResetTimer();
+    _handleAutoResetAndNotification(type);
 
     try {
       await _repository.updateMyStatus(type);
     } catch (e) {
-      // Revert on error (omitted for MVP)
       debugPrint('Error updating status: $e');
     }
   }
 
-  void _startAutoResetTimer() {
+  void _handleAutoResetAndNotification(UserStatusType type) {
     _autoResetTimer?.cancel();
     
-    // If we are already unknown, don't start the timer
-    if (_currentUser?.status.type == UserStatusType.unknown) return;
+    // If unknown (reset), cancel notifications
+    if (type == UserStatusType.unknown) {
+      _notificationService.cancelAllNotifications();
+      return;
+    }
 
-    _autoResetTimer = Timer(_autoResetDuration, () {
+    // Schedule local notification
+    _notificationService.scheduleResetNotification();
+
+    // Set internal timer for auto-reset
+    _autoResetTimer = Timer(UserStatus.expirationDuration, () {
       updateStatus(UserStatusType.unknown);
-      // Logic for local notification would trigger here
       debugPrint('Auto-reset triggered');
     });
   }
@@ -81,16 +88,18 @@ class StatusProvider extends ChangeNotifier {
     final status = _currentUser!.status;
     if (status.type == UserStatusType.unknown) return;
 
-    final diff = DateTime.now().difference(status.updatedAt);
-    if (diff >= _autoResetDuration) {
+    if (status.isExpired) {
       updateStatus(UserStatusType.unknown);
     } else {
       // Resume timer for remaining time
-      final remaining = _autoResetDuration - diff;
+      final remaining = status.expirationTime.difference(DateTime.now());
       _autoResetTimer?.cancel();
       _autoResetTimer = Timer(remaining, () {
         updateStatus(UserStatusType.unknown);
       });
+      // Note: We don't reschedule notification here as it should persist from app termination
+      // unless we want to be precise about rescheduling it.
+      // For MVP, assuming the OS handles the scheduled notification is fine.
     }
   }
 
