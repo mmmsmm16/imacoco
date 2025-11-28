@@ -3,6 +3,9 @@ import 'package:provider/provider.dart';
 import '../models/user_status.dart';
 import '../providers/status_provider.dart';
 
+/// アプリのメイン画面（ホーム画面）。
+///
+/// 自分のステータス更新セクションと、友達のステータスリストセクションを表示します。
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
@@ -36,14 +39,17 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
+/// 自分のステータスを表示・更新するセクション。
 class _MyStatusSection extends StatelessWidget {
   const _MyStatusSection();
 
   @override
   Widget build(BuildContext context) {
+    // ステータスの変更を監視
     final statusProvider = context.watch<StatusProvider>();
     final currentUser = statusProvider.currentUser;
 
+    // データ読み込み中はローディングを表示
     if (currentUser == null) {
       return const SizedBox(height: 200, child: Center(child: CircularProgressIndicator()));
     }
@@ -62,6 +68,7 @@ class _MyStatusSection extends StatelessWidget {
             style: Theme.of(context).textTheme.displayMedium,
           ),
           const SizedBox(height: 24),
+          // ステータス選択ボタンのリスト
           Wrap(
             spacing: 16,
             runSpacing: 16,
@@ -80,6 +87,7 @@ class _MyStatusSection extends StatelessWidget {
   }
 }
 
+/// ステータス更新用のボタンウィジェット。
 class _StatusButton extends StatelessWidget {
   final UserStatusType type;
 
@@ -125,6 +133,7 @@ class _StatusButton extends StatelessWidget {
   }
 }
 
+/// 友達（他ユーザー）のステータスリストを表示するセクション。
 class _FriendListSection extends StatelessWidget {
   const _FriendListSection();
 
@@ -141,9 +150,10 @@ class _FriendListSection extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       itemBuilder: (context, index) {
         final friend = friends[index];
-        // Check if status is expired (older than 1 hour)
-        final isExpired = DateTime.now().difference(friend.status.updatedAt).inHours >= 1;
-        // If expired or explicitly unknown, treat as unknown
+        // ステータスの有効期限チェック（モデルのロジックを使用）
+        final isExpired = friend.status.isExpired;
+
+        // 期限切れ、または明示的に「不明」の場合は「不明」として表示
         final displayStatusType = (isExpired || friend.status.type == UserStatusType.unknown)
             ? UserStatusType.unknown
             : friend.status.type;
@@ -156,7 +166,7 @@ class _FriendListSection extends StatelessWidget {
           child: ListTile(
             leading: CircleAvatar(
               backgroundColor: isUnknown ? Colors.grey : Theme.of(context).colorScheme.secondary,
-              child: Text(friend.name[0]),
+              child: Text(friend.name.isNotEmpty ? friend.name[0] : '?'),
             ),
             title: Text(friend.name),
             subtitle: Text(
@@ -173,6 +183,7 @@ class _FriendListSection extends StatelessWidget {
     );
   }
 
+  /// 更新日時を見やすい形式にフォーマットするヘルパーメソッド。
   String _formatTime(DateTime dt) {
     final diff = DateTime.now().difference(dt);
     if (diff.inMinutes < 1) return 'たった今';

@@ -1,3 +1,11 @@
+/// ユーザーの現在の状態を表す列挙型。
+///
+/// - [unknown]: 不明（初期状態または期限切れ）
+/// - [awake]: 起きた（活動開始）
+/// - [eating]: ご飯（食事中）
+/// - [free]: 暇（連絡歓迎）
+/// - [busy]: 集中（連絡不可）
+/// - [gaming]: ゲーム（プレイ中）
 enum UserStatusType {
   unknown,
   awake,
@@ -7,7 +15,14 @@ enum UserStatusType {
   gaming,
 }
 
+/// [UserStatusType] に対する拡張メソッド。
+///
+/// 表示用の絵文字やラベルを取得する機能を提供します。
 extension UserStatusTypeExtension on UserStatusType {
+  /// ステータスに対応する絵文字を取得します。
+  ///
+  /// Returns:
+  ///   ステータスを表す絵文字（String）。
   String get emoji {
     switch (this) {
       case UserStatusType.awake:
@@ -26,6 +41,10 @@ extension UserStatusTypeExtension on UserStatusType {
     }
   }
 
+  /// ステータスに対応する日本語ラベルを取得します。
+  ///
+  /// Returns:
+  ///   ステータスを表す日本語ラベル（String）。
   String get label {
     switch (this) {
       case UserStatusType.awake:
@@ -45,15 +64,36 @@ extension UserStatusTypeExtension on UserStatusType {
   }
 }
 
+/// ユーザーのステータス情報を保持するクラス。
+///
+/// ステータスの種類と更新日時を管理します。
+/// また、ステータスの有効期限に関するロジックも提供します。
 class UserStatus {
+  /// ステータスの種類
   final UserStatusType type;
+
+  /// ステータスが更新された日時
   final DateTime updatedAt;
 
+  /// ステータスの有効期限（1時間）
+  static const Duration expirationDuration = Duration(hours: 1);
+
+  /// [UserStatus] のコンストラクタ。
+  ///
+  /// Args:
+  ///   type: ステータスの種類。
+  ///   updatedAt: 更新日時。
   const UserStatus({
     required this.type,
     required this.updatedAt,
   });
 
+  /// 「不明」状態のインスタンスを作成するファクトリメソッド。
+  ///
+  /// 現在時刻を更新日時として設定します。
+  ///
+  /// Returns:
+  ///   UserStatusType.unknown な UserStatus インスタンス。
   factory UserStatus.unknown() {
     return UserStatus(
       type: UserStatusType.unknown,
@@ -61,6 +101,14 @@ class UserStatus {
     );
   }
 
+  /// 現在のインスタンスをコピーし、指定されたフィールドのみを更新した新しいインスタンスを返します。
+  ///
+  /// Args:
+  ///   type: 新しいステータスの種類（省略時は現在の値）。
+  ///   updatedAt: 新しい更新日時（省略時は現在の値）。
+  ///
+  /// Returns:
+  ///   新しい UserStatus インスタンス。
   UserStatus copyWith({
     UserStatusType? type,
     DateTime? updatedAt,
@@ -70,4 +118,22 @@ class UserStatus {
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }
+
+  /// ステータスが有効期限切れかどうかを判定します。
+  ///
+  /// ステータスが `unknown` の場合は常に false を返します。
+  /// 更新日時から [expirationDuration] 以上経過している場合に true を返します。
+  ///
+  /// Returns:
+  ///   有効期限切れであれば true、そうでなければ false。
+  bool get isExpired {
+    if (type == UserStatusType.unknown) return false;
+    return DateTime.now().difference(updatedAt) >= expirationDuration;
+  }
+
+  /// 有効期限が切れる時刻を取得します。
+  ///
+  /// Returns:
+  ///   更新日時 + 有効期限 の DateTime。
+  DateTime get expirationTime => updatedAt.add(expirationDuration);
 }
