@@ -65,6 +65,3 @@ lib/generated_plugin_registrant.dart
 # Exceptions to above rules.
 !**/android/**/build.gradle
 !**/android/app/src/main/AndroidManifest.xml
-
-# FVM Version Cache
-.fvm/
