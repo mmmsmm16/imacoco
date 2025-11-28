@@ -49,6 +49,9 @@ class UserStatus {
   final UserStatusType type;
   final DateTime updatedAt;
 
+  // ステータスの有効期限（1時間）
+  static const Duration expirationDuration = Duration(hours: 1);
+
   const UserStatus({
     required this.type,
     required this.updatedAt,
@@ -70,4 +73,13 @@ class UserStatus {
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }
+
+  /// ステータスが有効期限切れかどうかを判定する
+  bool get isExpired {
+    if (type == UserStatusType.unknown) return false;
+    return DateTime.now().difference(updatedAt) >= expirationDuration;
+  }
+
+  /// 有効期限が切れる時刻を取得
+  DateTime get expirationTime => updatedAt.add(expirationDuration);
 }
