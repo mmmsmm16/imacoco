@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "133543848732",
+    "project_id": "imacoco-f64b7",
+    "storage_bucket": "imacoco-f64b7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:133543848732:android:8beacca305a9ce5c94e8d9",
+        "android_client_info": {
+          "package_name": "com.example.imacoco"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBfDwH4U0_C5UYY-4hEKfSppNKRhwEukN4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
