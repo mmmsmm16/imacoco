@@ -17,12 +17,16 @@ class FloatingStatusBubbles extends StatefulWidget {
   final UserStatusType currentStatus;
   final String? currentCustomEmoji;
   final Function(UserStatusType, String?) onStatusSelected;
+  final Function(Color)? onBubbleDragColorChange; // 背景色変更用コールバック
+  final VoidCallback? onBubbleDragEnd; // ドラッグ終了用コールバック
 
   const FloatingStatusBubbles({
     super.key,
     required this.currentStatus,
     this.currentCustomEmoji,
     required this.onStatusSelected,
+    this.onBubbleDragColorChange,
+    this.onBubbleDragEnd,
   });
 
   @override
@@ -281,24 +285,45 @@ class _FloatingStatusBubblesState extends State<FloatingStatusBubbles>
                         ? bubble.customEmoji == widget.currentCustomEmoji
                         : bubble.type == widget.currentStatus && widget.currentCustomEmoji == null;
 
+                    final bubbleColor = bubble.isCustom ? Colors.pinkAccent : bubble.type.color;
+
                     return Positioned(
                       left: bubble.x * (constraints.maxWidth - bubble.size),
                       top: bubble.y * (constraints.maxHeight - bubble.size),
                       child: _BouncingBubble(
+                        // 背景色変化のロジックをタップ時にも入れる
                         onTap: () {
                           HapticFeedback.mediumImpact();
                           widget.onStatusSelected(
                             bubble.isCustom ? UserStatusType.free : bubble.type,
                             bubble.isCustom ? bubble.customEmoji : null,
                           );
+                          // タップ時も色を変更
+                          widget.onBubbleDragColorChange?.call(bubbleColor);
+                          widget.onBubbleDragEnd?.call(); // リセットも呼んで一瞬の変化にする
                         },
                         onLongPress: () {
                           HapticFeedback.heavyImpact();
                           _showDeleteConfirmDialog(bubble);
                         },
+                        // ドラッグ（スワイプ）操作の実装
+                        onPanUpdate: (details) {
+                          // 指の動きに合わせて速度を更新（弾く動き）
+                          // 画面サイズに対する相対速度に変換
+                          // 係数を調整して「飛び」具合を調整
+                          final sensitivity = 0.0001;
+                          bubble.dx = details.delta.dx * sensitivity;
+                          bubble.dy = details.delta.dy * sensitivity;
+
+                          // ドラッグ中は背景色を変更
+                          widget.onBubbleDragColorChange?.call(bubbleColor);
+                        },
+                        onPanEnd: (_) {
+                          widget.onBubbleDragEnd?.call();
+                        },
                         child: _GlassBubbleWidget(
                           emoji: bubble.displayEmoji,
-                          color: bubble.isCustom ? Colors.pinkAccent : bubble.type.color,
+                          color: bubbleColor,
                           size: bubble.size,
                           isCurrent: isCurrent,
                         ),
@@ -351,19 +376,24 @@ class _FloatingStatusBubblesState extends State<FloatingStatusBubbles>
       bubble.x += bubble.dx;
       bubble.y += bubble.dy;
 
+      // 摩擦（減衰）を追加して、弾いた後に徐々に元の速度感に戻るようにする
+      // ただし完全停止はさせず、漂う動きは残す
+      bubble.dx *= 0.98; // 減衰
+      bubble.dy *= 0.98; // 減衰
+
+      // 最小速度（漂う動き）を確保するための加算
       // ふわふわ（Wobble）
-      // X軸: サイン波、Y軸: コサイン波で楕円軌道っぽさを混ぜる
-      // 周期を個別に持たせることでバラバラな動きに
+      // 減衰した速度に加えて、自然な揺れを足す
       bubble.x += math.sin(t * bubble.wobbleSpeed + bubble.phaseX) * 0.0008;
       bubble.y += math.cos(t * bubble.wobbleSpeed + bubble.phaseY) * 0.0008;
 
       // 境界チェック（跳ね返り）
       if (bubble.x <= 0 || bubble.x >= 1.0) {
-        bubble.dx *= -1;
+        bubble.dx *= -1; // 壁に当たったら反転
         bubble.x = bubble.x.clamp(0.0, 1.0);
       }
       if (bubble.y <= 0 || bubble.y >= 1.0) {
-        bubble.dy *= -1;
+        bubble.dy *= -1; // 壁に当たったら反転
         bubble.y = bubble.y.clamp(0.0, 1.0);
       }
     }
@@ -371,15 +401,20 @@ class _FloatingStatusBubblesState extends State<FloatingStatusBubbles>
 }
 
 /// タップ時にボヨンと弾むアニメーションラッパー
+/// ジェスチャー（タップ、長押し、ドラッグ）もここで管理
 class _BouncingBubble extends StatefulWidget {
   final Widget child;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
+  final GestureDragUpdateCallback? onPanUpdate;
+  final GestureDragEndCallback? onPanEnd;
 
   const _BouncingBubble({
     required this.child,
     this.onTap,
     this.onLongPress,
+    this.onPanUpdate,
+    this.onPanEnd,
   });
 
   @override
@@ -413,9 +448,16 @@ class _BouncingBubbleState extends State<_BouncingBubble> with SingleTickerProvi
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
+      // タップダウンでアニメーション開始
       onTapDown: (_) => _controller.forward(from: 0),
       onTap: widget.onTap,
       onLongPress: widget.onLongPress,
+      // ドラッグ（フリック）操作
+      onPanUpdate: widget.onPanUpdate,
+      onPanEnd: widget.onPanEnd,
+      onPanCancel: () {
+        widget.onPanEnd?.call(DragEndDetails(velocity: Velocity.zero));
+      },
       child: AnimatedBuilder(
         animation: _controller,
         builder: (context, child) {

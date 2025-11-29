@@ -11,22 +11,55 @@ import '../widgets/friend_card.dart';
 ///
 /// 自分のステータス更新セクションと、友達のステータスリストセクションを表示します。
 /// 画面全体の背景色は選択されたステータスに応じて変化します。
-class HomeScreen extends StatelessWidget {
+/// また、バブルの操作（ドラッグなど）によって一時的に背景色が変化する演出を含みます。
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  // バブル操作による一時的なオーバーレイ色
+  Color? _tempBackgroundColor;
+
+  void _handleBubbleColorChange(Color color) {
+    if (_tempBackgroundColor != color) {
+      setState(() {
+        _tempBackgroundColor = color;
+      });
+    }
+  }
+
+  void _handleBubbleDragEnd() {
+    setState(() {
+      _tempBackgroundColor = null;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final statusProvider = context.watch<StatusProvider>();
     final currentUser = statusProvider.currentUser;
 
-    // 背景グラデーションの取得（ユーザー未ロード時はデフォルト）
-    final bgColors = currentUser?.status.type.backgroundColors ??
+    // 基本の背景グラデーション
+    final baseBgColors = currentUser?.status.type.backgroundColors ??
         UserStatusType.unknown.backgroundColors;
 
     // テキスト色の判定
     final isLight = currentUser?.status.type.isLightBackground ?? false;
     final textColor = isLight ? Colors.black87 : Colors.white;
     final subTextColor = isLight ? Colors.black54 : Colors.white70;
+
+    // 動的な背景色の計算
+    // 一時的な色がある場合は、それをグラデーションに混ぜる
+    List<Color> displayColors = baseBgColors;
+    if (_tempBackgroundColor != null) {
+      displayColors = [
+        Color.lerp(baseBgColors[0], _tempBackgroundColor, 0.6)!,
+        Color.lerp(baseBgColors[1], _tempBackgroundColor, 0.4)!,
+      ];
+    }
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -43,25 +76,25 @@ class HomeScreen extends StatelessWidget {
         elevation: 0,
         backgroundColor: Colors.transparent,
       ),
-      // リッチな背景演出：AnimatedContainer + AnimatedBackground
+      // リッチな背景演出
       body: Stack(
         children: [
           // ベースの背景（グラデーション遷移）
           AnimatedContainer(
-            duration: const Duration(milliseconds: 500),
-            curve: Curves.easeInOut,
+            duration: const Duration(milliseconds: 300), // バブル操作に追従するため少し速く
+            curve: Curves.easeOut,
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: bgColors,
+                colors: displayColors,
               ),
             ),
           ),
 
-          // パーティクルアニメーション（その上に重ねる）
+          // パーティクルアニメーション
           Positioned.fill(
-            child: AnimatedBackground(colors: bgColors),
+            child: AnimatedBackground(colors: displayColors),
           ),
 
           // メインコンテンツ
@@ -71,7 +104,7 @@ class HomeScreen extends StatelessWidget {
               children: [
                 // ステータス変更エリア（浮遊バブルUI）
                 Expanded(
-                  flex: 4, // 画面の4割くらいを浮遊エリアに
+                  flex: 4,
                   child: currentUser == null
                       ? const Center(child: CircularProgressIndicator())
                       : FloatingStatusBubbles(
@@ -80,6 +113,9 @@ class HomeScreen extends StatelessWidget {
                           onStatusSelected: (type, customEmoji) {
                             statusProvider.updateStatus(type, customEmoji: customEmoji);
                           },
+                          // バブル操作時の色変化コールバック
+                          onBubbleDragColorChange: _handleBubbleColorChange,
+                          onBubbleDragEnd: _handleBubbleDragEnd,
                         ),
                 ),
 
@@ -105,9 +141,9 @@ class HomeScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
 
-                // 友達リスト（下半分） - グリッド表示に変更
+                // 友達リスト（下半分）
                 Expanded(
-                  flex: 5, // 画面の5割くらいをリストに
+                  flex: 5,
                   child: _FriendGridSection(
                     subTextColor: subTextColor,
                   ),
