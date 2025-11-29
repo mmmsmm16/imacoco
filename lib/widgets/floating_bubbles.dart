@@ -169,7 +169,7 @@ class _FloatingStatusBubblesState extends State<FloatingStatusBubbles>
                   config: Config(
                     height: 256,
                     checkPlatformCompatibility: true,
-                    // Version 4.x style config
+                    // Version 4.4.0 specific config (using safe parameters)
                     columns: 7,
                     emojiSizeMax: 32 * (foundation.defaultTargetPlatform == TargetPlatform.iOS ? 1.30 : 1.0),
                     verticalSpacing: 0,
