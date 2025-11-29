@@ -125,6 +125,9 @@ class _InteractiveStatusHeaderState extends State<_InteractiveStatusHeader>
   }
 
   void _toggleMenu() {
+    // マウントされていない場合は処理しない（エラー対策）
+    if (!mounted) return;
+
     HapticFeedback.lightImpact();
     setState(() {
       _isExpanded = !_isExpanded;
@@ -138,6 +141,8 @@ class _InteractiveStatusHeaderState extends State<_InteractiveStatusHeader>
 
   Future<void> _updateStatus(UserStatusType type) async {
     HapticFeedback.mediumImpact();
+
+    // BuildContextを保持するため、providerを先に取得
     final provider = context.read<StatusProvider>();
 
     // メニューを閉じる
@@ -169,8 +174,9 @@ class _InteractiveStatusHeaderState extends State<_InteractiveStatusHeader>
           mainAxisSize: MainAxisSize.min,
           children: [
             // メインのステータス表示（またはメニュー中心）
+            // メニュー展開時の領域を確保するため、少し大きめに設定
             SizedBox(
-              height: 220, // メニュー展開用のスペース確保
+              height: 280, // 以前は220だったが、タッチ判定領域を広げるため拡大
               child: Stack(
                 alignment: Alignment.center,
                 clipBehavior: Clip.none,
@@ -247,7 +253,7 @@ class _InteractiveStatusHeaderState extends State<_InteractiveStatusHeader>
     // 定義された選択可能なステータスを取得
     final options = UserStatus.selectableStatuses;
 
-    const double radius = 90.0;
+    const double radius = 100.0; // 少し広げる
     // アイテムを円周上に配置 (-90度 = 上 からスタート)
     const double startAngle = -math.pi / 2;
     final double step = (2 * math.pi) / options.length;
@@ -259,6 +265,11 @@ class _InteractiveStatusHeaderState extends State<_InteractiveStatusHeader>
       return AnimatedBuilder(
         animation: _expandAnimation,
         builder: (context, child) {
+          // Transform.translateは描画位置を変えるだけで、レイアウト（ヒットテスト）に影響しない場合がある
+          // そのため、Stack内で明示的にサイズを持ったコンテナとして扱うか、
+          // またはTransform後に十分なヒットテスト領域があることを確認する。
+          // ここではStackの中心(0,0)からオフセットしているので、親Stackのサイズが十分なら問題ないはず。
+
           return Transform.translate(
             offset: Offset(
               radius * _expandAnimation.value * math.cos(angle),
