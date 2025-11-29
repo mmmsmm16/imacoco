@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'dart:math' as math; // アニメーション計算用
 import '../models/user_status.dart';
 import '../providers/status_provider.dart';
+import '../widgets/floating_bubbles.dart';
 
 /// アプリのメイン画面（ホーム画面）。
 ///
@@ -52,8 +53,18 @@ class HomeScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // ステータス変更ヘッダー（インタラクティブメニュー）
-              _InteractiveStatusHeader(textColor: textColor),
+              // ステータス変更エリア（浮遊バブルUI）
+              Expanded(
+                flex: 4, // 画面の4割くらいを浮遊エリアに
+                child: currentUser == null
+                    ? const Center(child: CircularProgressIndicator())
+                    : FloatingStatusBubbles(
+                        currentStatus: currentUser.status.type,
+                        onStatusSelected: (type) {
+                          statusProvider.updateStatus(type);
+                        },
+                      ),
+              ),
 
               const SizedBox(height: 16),
 
@@ -76,174 +87,16 @@ class HomeScreen extends StatelessWidget {
               ),
               const SizedBox(height: 8),
 
-              // 友達リスト（expanded）
-              Expanded(child: _FriendListSection(textColor: textColor, subTextColor: subTextColor)),
+              // 友達リスト（下半分）
+              Expanded(
+                flex: 5, // 画面の5割くらいをリストに
+                child: _FriendListSection(
+                  textColor: textColor,
+                  subTextColor: subTextColor,
+                ),
+              ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-/// インタラクティブなステータス変更ヘッダー。
-///
-/// 通常時は現在のステータスのみを表示し、タップするとメニューが展開します。
-class _InteractiveStatusHeader extends StatefulWidget {
-  final Color textColor;
-
-  const _InteractiveStatusHeader({required this.textColor});
-
-  @override
-  State<_InteractiveStatusHeader> createState() => _InteractiveStatusHeaderState();
-}
-
-class _InteractiveStatusHeaderState extends State<_InteractiveStatusHeader>
-    with SingleTickerProviderStateMixin {
-  bool _isExpanded = false;
-  late AnimationController _controller;
-  late Animation<double> _expandAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300),
-    );
-    _expandAnimation = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.elasticOut,
-      reverseCurve: Curves.easeIn,
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _toggleMenu() {
-    // マウントされていない場合は処理しない（エラー対策）
-    if (!mounted) return;
-
-    HapticFeedback.lightImpact();
-    setState(() {
-      _isExpanded = !_isExpanded;
-      if (_isExpanded) {
-        _controller.forward();
-      } else {
-        _controller.reverse();
-      }
-    });
-  }
-
-  Future<void> _updateStatus(UserStatusType type) async {
-    HapticFeedback.mediumImpact();
-
-    // BuildContextを保持するため、providerを先に取得
-    final provider = context.read<StatusProvider>();
-
-    // メニューを閉じる
-    _toggleMenu();
-
-    // ステータス更新
-    await provider.updateStatus(type);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // ステータスの変更を監視
-    final statusProvider = context.watch<StatusProvider>();
-    final currentUser = statusProvider.currentUser;
-
-    // データ読み込み中はローディングを表示
-    if (currentUser == null) {
-      return const SizedBox(height: 150, child: Center(child: CircularProgressIndicator()));
-    }
-
-    final currentType = currentUser.status.type;
-
-    return GestureDetector(
-      onTap: _isExpanded ? _toggleMenu : null, // 展開中は背景タップで閉じる
-      behavior: HitTestBehavior.translucent,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // メインのステータス表示（またはメニュー中心）
-            // メニュー展開時の領域を確保するため、少し大きめに設定
-            SizedBox(
-              height: 280, // 以前は220だったが、タッチ判定領域を広げるため拡大
-              child: Stack(
-                alignment: Alignment.center,
-                clipBehavior: Clip.none,
-                children: [
-                  // 展開されるメニュー項目
-                  ..._buildMenuItems(currentType),
-
-                  // 中央の現在のステータス（トリガーボタン）
-                  GestureDetector(
-                    onTap: _toggleMenu,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      width: 100,
-                      height: 100,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: _isExpanded
-                            ? Colors.white.withOpacity(0.9)
-                            : currentType.color.withOpacity(0.3),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: _isExpanded
-                              ? Colors.grey.withOpacity(0.5)
-                              : currentType.color.withOpacity(0.8),
-                          width: 2,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: currentType.color.withOpacity(0.4),
-                            blurRadius: _isExpanded ? 30 : 20,
-                            spreadRadius: _isExpanded ? 10 : 5,
-                          ),
-                        ],
-                      ),
-                      child: Center(
-                        child: Text(
-                          _isExpanded ? '❌' : currentType.emoji,
-                          style: const TextStyle(fontSize: 48),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // ステータスラベル（削除済みだが、タップ誘導のテキストは残すかどうか）
-            // ユーザー要望によりステータス名は削除。
-            // 誘導テキストのみフェード表示
-            AnimatedOpacity(
-              opacity: _isExpanded ? 0.0 : 1.0,
-              duration: const Duration(milliseconds: 200),
-              child: Column(
-                children: [
-                  const SizedBox(height: 8),
-                  Text(
-                    'Tap to change', // 英語または日本語でシンプルに
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: widget.textColor.withOpacity(0.5),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
         ),
       ),
     );
@@ -290,45 +143,6 @@ class _InteractiveStatusHeaderState extends State<_InteractiveStatusHeader>
         },
       );
     });
-  }
-}
-
-/// メニュー内の各ステータスボタン。
-class _MenuItemButton extends StatelessWidget {
-  final UserStatusType type;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _MenuItemButton({
-    required this.type,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(30),
-      child: Container(
-        width: 60,
-        height: 60,
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.9),
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: type.color.withOpacity(0.5),
-              blurRadius: 8,
-              spreadRadius: 2,
-            ),
-          ],
-        ),
-        child: Center(
-          child: Text(type.emoji, style: const TextStyle(fontSize: 32)), // テキスト削除につきアイコンを大きく
-        ),
-      ),
-    );
   }
 }
 
