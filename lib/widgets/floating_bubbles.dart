@@ -636,7 +636,7 @@ class _GlassBubbleWidget extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(displaySize / 2),
             child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+              filter: ui.ImageFilter.blur(sigmaX: 8, sigmaY: 8),
               child: Container(
                 decoration: BoxDecoration(
                   color: isCurrent
