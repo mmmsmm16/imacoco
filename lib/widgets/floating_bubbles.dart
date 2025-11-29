@@ -166,7 +166,7 @@ class _FloatingStatusBubblesState extends State<FloatingStatusBubbles>
                   onEmojiSelected: (category, emoji) {
                     Navigator.pop(context, emoji.emoji);
                   },
-                  // エラー回避のためデフォルト設定を使用
+                  // エラー回避のためデフォルト設定を使用（パラメータなし）
                   config: const Config(),
                 ),
               ),
@@ -270,7 +270,21 @@ class _FloatingStatusBubblesState extends State<FloatingStatusBubbles>
                         ? bubble.customEmoji == widget.currentCustomEmoji
                         : bubble.type == widget.currentStatus && widget.currentCustomEmoji == null;
 
-                    final bubbleColor = bubble.isCustom ? Colors.pinkAccent : bubble.type.color;
+                    // カスタム絵文字の色生成ロジック
+                    // 絵文字のハッシュコードを使って一意な色を生成する
+                    Color bubbleColor;
+                    if (bubble.isCustom) {
+                      // ハッシュコードをシードにしてランダムなパステルカラーを生成
+                      final hash = bubble.customEmoji.hashCode;
+                      // H: 0-360, S: 0.5-0.8, V: 0.8-1.0
+                      // あまり暗くならないように調整
+                      final h = (hash % 360).toDouble();
+                      final s = 0.5 + ((hash >> 8) % 40) / 100.0; // 0.5-0.9
+                      final v = 0.8 + ((hash >> 16) % 20) / 100.0; // 0.8-1.0
+                      bubbleColor = HSVColor.fromAHSV(1.0, h, s, v).toColor();
+                    } else {
+                      bubbleColor = bubble.type.color;
+                    }
 
                     return Positioned(
                       left: bubble.x * (constraints.maxWidth - bubble.size),
