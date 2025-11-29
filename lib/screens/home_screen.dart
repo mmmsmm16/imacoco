@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // HapticFeedback用
 import 'package:provider/provider.dart';
+import 'dart:math' as math; // アニメーション計算用
 import '../models/user_status.dart';
 import '../providers/status_provider.dart';
 import '../widgets/floating_bubbles.dart';
@@ -99,6 +100,49 @@ class HomeScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  List<Widget> _buildMenuItems(UserStatusType currentType) {
+    // 定義された選択可能なステータスを取得
+    final options = UserStatus.selectableStatuses;
+
+    const double radius = 100.0; // 少し広げる
+    // アイテムを円周上に配置 (-90度 = 上 からスタート)
+    const double startAngle = -math.pi / 2;
+    final double step = (2 * math.pi) / options.length;
+
+    return List.generate(options.length, (index) {
+      final type = options[index];
+      final angle = startAngle + (step * index);
+
+      return AnimatedBuilder(
+        animation: _expandAnimation,
+        builder: (context, child) {
+          // Transform.translateは描画位置を変えるだけで、レイアウト（ヒットテスト）に影響しない場合がある
+          // そのため、Stack内で明示的にサイズを持ったコンテナとして扱うか、
+          // またはTransform後に十分なヒットテスト領域があることを確認する。
+          // ここではStackの中心(0,0)からオフセットしているので、親Stackのサイズが十分なら問題ないはず。
+
+          return Transform.translate(
+            offset: Offset(
+              radius * _expandAnimation.value * math.cos(angle),
+              radius * _expandAnimation.value * math.sin(angle),
+            ),
+            child: Opacity(
+              opacity: _expandAnimation.value,
+              child: Transform.scale(
+                scale: _expandAnimation.value,
+                child: _MenuItemButton(
+                  type: type,
+                  isSelected: type == currentType,
+                  onTap: () => _updateStatus(type),
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    });
   }
 }
 
@@ -199,6 +243,7 @@ class _FriendListSection extends StatelessWidget {
     );
   }
 
+  /// 更新日時を見やすい形式にフォーマットするヘルパーメソッド。
   String _formatTime(DateTime dt) {
     final diff = DateTime.now().difference(dt);
     if (diff.inMinutes < 1) return 'たった今';
