@@ -42,7 +42,6 @@ class HomeScreen extends StatelessWidget {
         centerTitle: true,
         elevation: 0,
         backgroundColor: Colors.transparent,
-        systemOverlayStyle: isLight ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light,
       ),
       // リッチな背景演出：AnimatedContainer + AnimatedBackground
       body: Stack(

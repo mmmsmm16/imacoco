@@ -35,6 +35,9 @@ class _FloatingStatusBubblesState extends State<FloatingStatusBubbles>
   List<_BubbleModel> _bubbles = [];
   final math.Random _random = math.Random();
 
+  // バブルが画面外に行き過ぎないためのパディング率
+  static const double _padding = 0.1;
+
   @override
   void initState() {
     super.initState();
