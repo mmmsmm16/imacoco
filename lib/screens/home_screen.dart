@@ -149,9 +149,11 @@ class _InteractiveStatusHeaderState extends State<_InteractiveStatusHeader>
 
   @override
   Widget build(BuildContext context) {
+    // ステータスの変更を監視
     final statusProvider = context.watch<StatusProvider>();
     final currentUser = statusProvider.currentUser;
 
+    // データ読み込み中はローディングを表示
     if (currentUser == null) {
       return const SizedBox(height: 150, child: Center(child: CircularProgressIndicator()));
     }
@@ -434,6 +436,7 @@ class _FriendListSection extends StatelessWidget {
     );
   }
 
+  /// 更新日時を見やすい形式にフォーマットするヘルパーメソッド。
   String _formatTime(DateTime dt) {
     final diff = DateTime.now().difference(dt);
     if (diff.inMinutes < 1) return 'たった今';

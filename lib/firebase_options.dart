@@ -27,10 +27,7 @@ class DefaultFirebaseOptions {
       case TargetPlatform.macOS:
         return macos;
       case TargetPlatform.windows:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for windows - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return windows;
       case TargetPlatform.linux:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for linux - '
@@ -44,37 +41,47 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'DUMMY_API_KEY_FOR_BUILD',
-    appId: '1:123456789:web:dummy123',
-    messagingSenderId: '123456789',
-    projectId: 'imacoco-dummy',
-    authDomain: 'imacoco-dummy.firebaseapp.com',
-    storageBucket: 'imacoco-dummy.appspot.com',
+    apiKey: 'AIzaSyC1WkWxR53kQhBxlJmy9v5YOOiLXpO1_Lo',
+    appId: '1:133543848732:web:b2a405bdcfc4e91494e8d9',
+    messagingSenderId: '133543848732',
+    projectId: 'imacoco-f64b7',
+    authDomain: 'imacoco-f64b7.firebaseapp.com',
+    storageBucket: 'imacoco-f64b7.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'DUMMY_API_KEY_FOR_BUILD',
-    appId: '1:123456789:android:dummy123',
-    messagingSenderId: '123456789',
-    projectId: 'imacoco-dummy',
-    storageBucket: 'imacoco-dummy.appspot.com',
+    apiKey: 'AIzaSyBfDwH4U0_C5UYY-4hEKfSppNKRhwEukN4',
+    appId: '1:133543848732:android:8beacca305a9ce5c94e8d9',
+    messagingSenderId: '133543848732',
+    projectId: 'imacoco-f64b7',
+    storageBucket: 'imacoco-f64b7.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'DUMMY_API_KEY_FOR_BUILD',
-    appId: '1:123456789:ios:dummy123',
-    messagingSenderId: '123456789',
-    projectId: 'imacoco-dummy',
-    storageBucket: 'imacoco-dummy.appspot.com',
+    apiKey: 'AIzaSyB1gksvL4oPM_KB35_AXOMcMLXvM5VAHhc',
+    appId: '1:133543848732:ios:83e17f7958fa0a5c94e8d9',
+    messagingSenderId: '133543848732',
+    projectId: 'imacoco-f64b7',
+    storageBucket: 'imacoco-f64b7.firebasestorage.app',
     iosBundleId: 'com.example.imacoco',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'DUMMY_API_KEY_FOR_BUILD',
-    appId: '1:123456789:macos:dummy123',
-    messagingSenderId: '123456789',
-    projectId: 'imacoco-dummy',
-    storageBucket: 'imacoco-dummy.appspot.com',
-    iosBundleId: 'com.example.imacoco.RunnerTests',
+    apiKey: 'AIzaSyB1gksvL4oPM_KB35_AXOMcMLXvM5VAHhc',
+    appId: '1:133543848732:ios:83e17f7958fa0a5c94e8d9',
+    messagingSenderId: '133543848732',
+    projectId: 'imacoco-f64b7',
+    storageBucket: 'imacoco-f64b7.firebasestorage.app',
+    iosBundleId: 'com.example.imacoco',
   );
+
+  static const FirebaseOptions windows = FirebaseOptions(
+    apiKey: 'AIzaSyC1WkWxR53kQhBxlJmy9v5YOOiLXpO1_Lo',
+    appId: '1:133543848732:web:b9ec7378abd2e7ff94e8d9',
+    messagingSenderId: '133543848732',
+    projectId: 'imacoco-f64b7',
+    authDomain: 'imacoco-f64b7.firebaseapp.com',
+    storageBucket: 'imacoco-f64b7.firebasestorage.app',
+  );
+
 }
