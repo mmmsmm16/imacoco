@@ -66,9 +66,11 @@ class _MyStatusSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // ステータスの変更を監視
     final statusProvider = context.watch<StatusProvider>();
     final currentUser = statusProvider.currentUser;
 
+    // データ読み込み中はローディングを表示
     if (currentUser == null) {
       return const SizedBox(height: 200, child: Center(child: CircularProgressIndicator()));
     }
