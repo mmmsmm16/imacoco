@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // HapticFeedback用
 import 'package:provider/provider.dart';
-import 'dart:math' as math; // アニメーション計算用
 import '../models/user_status.dart';
 import '../providers/status_provider.dart';
 import '../widgets/floating_bubbles.dart';
+import '../widgets/friend_card.dart';
 
 /// アプリのメイン画面（ホーム画面）。
 ///
@@ -32,7 +32,11 @@ class HomeScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text(
           'Imacoco',
-          style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: textColor,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1.2,
+          ),
         ),
         centerTitle: true,
         elevation: 0,
@@ -60,38 +64,39 @@ class HomeScreen extends StatelessWidget {
                     ? const Center(child: CircularProgressIndicator())
                     : FloatingStatusBubbles(
                         currentStatus: currentUser.status.type,
-                        onStatusSelected: (type) {
-                          statusProvider.updateStatus(type);
+                        currentCustomEmoji: currentUser.status.customEmoji,
+                        onStatusSelected: (type, customEmoji) {
+                          statusProvider.updateStatus(type, customEmoji: customEmoji);
                         },
                       ),
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
 
               // 友達リストのヘッダー
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
                 child: Row(
                   children: [
-                    Icon(Icons.people_outline, color: subTextColor, size: 20),
+                    Icon(Icons.grid_view_rounded, color: subTextColor.withOpacity(0.8), size: 18),
                     const SizedBox(width: 8),
                     Text(
-                      'みんなの様子',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: subTextColor,
+                      'FRIENDS',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            color: subTextColor.withOpacity(0.8),
                             fontWeight: FontWeight.bold,
+                            letterSpacing: 1.5,
                           ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
 
-              // 友達リスト（下半分）
+              // 友達リスト（下半分） - グリッド表示に変更
               Expanded(
                 flex: 5, // 画面の5割くらいをリストに
-                child: _FriendListSection(
-                  textColor: textColor,
+                child: _FriendGridSection(
                   subTextColor: subTextColor,
                 ),
               ),
@@ -101,57 +106,13 @@ class HomeScreen extends StatelessWidget {
       ),
     );
   }
-
-  List<Widget> _buildMenuItems(UserStatusType currentType) {
-    // 定義された選択可能なステータスを取得
-    final options = UserStatus.selectableStatuses;
-
-    const double radius = 100.0; // 少し広げる
-    // アイテムを円周上に配置 (-90度 = 上 からスタート)
-    const double startAngle = -math.pi / 2;
-    final double step = (2 * math.pi) / options.length;
-
-    return List.generate(options.length, (index) {
-      final type = options[index];
-      final angle = startAngle + (step * index);
-
-      return AnimatedBuilder(
-        animation: _expandAnimation,
-        builder: (context, child) {
-          // Transform.translateは描画位置を変えるだけで、レイアウト（ヒットテスト）に影響しない場合がある
-          // そのため、Stack内で明示的にサイズを持ったコンテナとして扱うか、
-          // またはTransform後に十分なヒットテスト領域があることを確認する。
-          // ここではStackの中心(0,0)からオフセットしているので、親Stackのサイズが十分なら問題ないはず。
-
-          return Transform.translate(
-            offset: Offset(
-              radius * _expandAnimation.value * math.cos(angle),
-              radius * _expandAnimation.value * math.sin(angle),
-            ),
-            child: Opacity(
-              opacity: _expandAnimation.value,
-              child: Transform.scale(
-                scale: _expandAnimation.value,
-                child: _MenuItemButton(
-                  type: type,
-                  isSelected: type == currentType,
-                  onTap: () => _updateStatus(type),
-                ),
-              ),
-            ),
-          );
-        },
-      );
-    });
-  }
 }
 
-/// 友達（他ユーザー）のステータスリストを表示するセクション。
-class _FriendListSection extends StatelessWidget {
-  final Color textColor;
+/// 友達（他ユーザー）のステータスをグリッド表示するセクション。
+class _FriendGridSection extends StatelessWidget {
   final Color subTextColor;
 
-  const _FriendListSection({required this.textColor, required this.subTextColor});
+  const _FriendGridSection({required this.subTextColor});
 
   @override
   Widget build(BuildContext context) {
@@ -175,80 +136,25 @@ class _FriendListSection extends StatelessWidget {
           children: [
             Icon(Icons.nights_stay_outlined, size: 48, color: subTextColor.withOpacity(0.3)),
             const SizedBox(height: 16),
-            Text('まだ誰もいません', style: TextStyle(color: subTextColor.withOpacity(0.5))),
+            Text('No friends active...', style: TextStyle(color: subTextColor.withOpacity(0.5))),
           ],
         ),
       );
     }
 
-    return ListView.builder(
+    return GridView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2, // 2列
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 0.85, // 縦長カード
+      ),
       itemCount: sortedFriends.length,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       itemBuilder: (context, index) {
         final friend = sortedFriends[index];
-        final isExpired = friend.status.isExpired;
-
-        final displayStatusType = (isExpired || friend.status.type == UserStatusType.unknown)
-            ? UserStatusType.unknown
-            : friend.status.type;
-        
-        final isUnknown = displayStatusType == UserStatusType.unknown;
-        final statusColor = displayStatusType.color;
-
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            color: Colors.white.withOpacity(0.1), // 半透明ベース
-            border: Border.all(
-              color: isUnknown ? Colors.grey.withOpacity(0.2) : statusColor.withOpacity(0.5),
-              width: 1,
-            ),
-          ),
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            leading: CircleAvatar(
-              backgroundColor: isUnknown ? Colors.grey.withOpacity(0.5) : statusColor,
-              foregroundColor: Colors.white,
-              child: Text(friend.name.isNotEmpty ? friend.name[0] : '?'),
-            ),
-            title: Text(
-              friend.name,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: textColor,
-              ),
-            ),
-            subtitle: Text(
-              isExpired ? '1時間以上前' : _formatTime(friend.status.updatedAt),
-              style: TextStyle(
-                fontSize: 12,
-                color: subTextColor,
-              ),
-            ),
-            trailing: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.black12,
-                shape: BoxShape.circle,
-              ),
-              child: Text(
-                displayStatusType.emoji,
-                style: const TextStyle(fontSize: 28),
-              ),
-            ),
-          ),
-        );
+        return FriendCard(user: friend);
       },
     );
-  }
-
-  /// 更新日時を見やすい形式にフォーマットするヘルパーメソッド。
-  String _formatTime(DateTime dt) {
-    final diff = DateTime.now().difference(dt);
-    if (diff.inMinutes < 1) return 'たった今';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}分前';
-    if (diff.inHours < 24) return '${diff.inHours}時間前';
-    return '${dt.month}/${dt.day}';
   }
 }
