@@ -37,7 +37,6 @@ class HomeScreen extends StatelessWidget {
         centerTitle: true,
         elevation: 0,
         backgroundColor: Colors.transparent,
-        systemOverlayStyle: isLight ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light,
       ),
       body: AnimatedContainer(
         duration: const Duration(milliseconds: 500),
@@ -100,49 +99,6 @@ class HomeScreen extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  List<Widget> _buildMenuItems(UserStatusType currentType) {
-    // 定義された選択可能なステータスを取得
-    final options = UserStatus.selectableStatuses;
-
-    const double radius = 100.0; // 少し広げる
-    // アイテムを円周上に配置 (-90度 = 上 からスタート)
-    const double startAngle = -math.pi / 2;
-    final double step = (2 * math.pi) / options.length;
-
-    return List.generate(options.length, (index) {
-      final type = options[index];
-      final angle = startAngle + (step * index);
-
-      return AnimatedBuilder(
-        animation: _expandAnimation,
-        builder: (context, child) {
-          // Transform.translateは描画位置を変えるだけで、レイアウト（ヒットテスト）に影響しない場合がある
-          // そのため、Stack内で明示的にサイズを持ったコンテナとして扱うか、
-          // またはTransform後に十分なヒットテスト領域があることを確認する。
-          // ここではStackの中心(0,0)からオフセットしているので、親Stackのサイズが十分なら問題ないはず。
-
-          return Transform.translate(
-            offset: Offset(
-              radius * _expandAnimation.value * math.cos(angle),
-              radius * _expandAnimation.value * math.sin(angle),
-            ),
-            child: Opacity(
-              opacity: _expandAnimation.value,
-              child: Transform.scale(
-                scale: _expandAnimation.value,
-                child: _MenuItemButton(
-                  type: type,
-                  isSelected: type == currentType,
-                  onTap: () => _updateStatus(type),
-                ),
-              ),
-            ),
-          );
-        },
-      );
-    });
   }
 }
 
