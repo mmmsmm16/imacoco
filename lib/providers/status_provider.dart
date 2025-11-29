@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
 import '../models/user_status.dart';
 import '../repositories/status_repository.dart';
@@ -18,6 +19,14 @@ class StatusProvider extends ChangeNotifier {
   Timer? _autoResetTimer;
   StreamSubscription? _friendsSubscription;
 
+  // カスタムバブル機能用のリスト
+  List<String> _customBubbles = [];
+  // 非表示にしたデフォルトバブル（インデックスで保存）
+  List<int> _hiddenDefaultBubbleIndices = [];
+
+  static const String _prefsCustomBubblesKey = 'custom_bubbles';
+  static const String _prefsHiddenDefaultsKey = 'hidden_default_bubbles';
+
   /// [StatusProvider] のコンストラクタ。
   ///
   /// Args:
@@ -32,6 +41,13 @@ class StatusProvider extends ChangeNotifier {
   /// 友達（全ユーザー）のリスト。
   List<User> get friends => _friends;
 
+  /// ローカル保存されたカスタムバブル（絵文字）のリスト
+  List<String> get customBubbles => _customBubbles;
+
+  /// 非表示になっているデフォルトバブルの種類のリスト
+  List<UserStatusType> get hiddenDefaultTypes =>
+    _hiddenDefaultBubbleIndices.map((i) => UserStatusType.values[i]).toList();
+
   /// 初期化処理。
   ///
   /// 通知サービスの初期化、友達リストの監視、初期データの読み込みを行います。
@@ -39,6 +55,9 @@ class StatusProvider extends ChangeNotifier {
     // 通知サービスの初期化と権限リクエスト
     await _notificationService.init();
     await _notificationService.requestPermissions();
+
+    // ローカルデータの読み込み
+    await _loadLocalPreferences();
 
     // 友達リストの変更を監視
     _friendsSubscription = _repository.friendsStream.listen((friends) {
@@ -48,6 +67,66 @@ class StatusProvider extends ChangeNotifier {
 
     // 初期データのロード（自分の情報など）
     _loadInitialData();
+  }
+
+  /// カスタムバブルと非表示設定をSharedPreferencesから読み込みます。
+  Future<void> _loadLocalPreferences() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _customBubbles = prefs.getStringList(_prefsCustomBubblesKey) ?? [];
+
+      final hiddenIndices = prefs.getStringList(_prefsHiddenDefaultsKey);
+      if (hiddenIndices != null) {
+        _hiddenDefaultBubbleIndices = hiddenIndices.map((e) => int.parse(e)).toList();
+      }
+
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading local preferences: $e');
+    }
+  }
+
+  /// カスタムバブルを追加します。
+  Future<void> addCustomBubble(String emoji) async {
+    if (_customBubbles.contains(emoji)) return;
+
+    _customBubbles.add(emoji);
+    notifyListeners();
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_prefsCustomBubblesKey, _customBubbles);
+  }
+
+  /// カスタムバブルを削除します。
+  Future<void> removeCustomBubble(String emoji) async {
+    _customBubbles.remove(emoji);
+    notifyListeners();
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_prefsCustomBubblesKey, _customBubbles);
+  }
+
+  /// デフォルトバブルを非表示にします（削除扱い）。
+  Future<void> hideDefaultBubble(UserStatusType type) async {
+    if (_hiddenDefaultBubbleIndices.contains(type.index)) return;
+
+    _hiddenDefaultBubbleIndices.add(type.index);
+    notifyListeners();
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(
+      _prefsHiddenDefaultsKey,
+      _hiddenDefaultBubbleIndices.map((e) => e.toString()).toList(),
+    );
+  }
+
+  /// 非表示にしたデフォルトバブルを全て元に戻します（オプション機能）。
+  Future<void> restoreDefaultBubbles() async {
+    _hiddenDefaultBubbleIndices.clear();
+    notifyListeners();
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_prefsHiddenDefaultsKey);
   }
 
   /// 初期データの読み込み。
@@ -80,11 +159,16 @@ class StatusProvider extends ChangeNotifier {
   ///
   /// Args:
   ///   type: 新しいステータスの種類。
-  Future<void> updateStatus(UserStatusType type) async {
+  ///   customEmoji: カスタム絵文字（省略可）。
+  Future<void> updateStatus(UserStatusType type, {String? customEmoji}) async {
     // 楽観的UI更新（サーバーレスポンスを待たずにUIを更新）
     final now = DateTime.now();
     _currentUser = _currentUser?.copyWith(
-      status: UserStatus(type: type, updatedAt: now),
+      status: UserStatus(
+        type: type,
+        updatedAt: now,
+        customEmoji: customEmoji,
+      ),
     );
     notifyListeners();
 
@@ -92,7 +176,7 @@ class StatusProvider extends ChangeNotifier {
     _handleAutoResetAndNotification(type);
 
     try {
-      await _repository.updateMyStatus(type);
+      await _repository.updateMyStatus(type, customEmoji: customEmoji);
     } catch (e) {
       debugPrint('Error updating status: $e');
       // 必要であればエラー時に元の状態に戻す処理を追加
