@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui';
+import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
+import 'package:flutter/foundation.dart' as foundation;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -77,7 +79,6 @@ class _FloatingStatusBubblesState extends State<FloatingStatusBubbles>
     });
 
     // 新しいものを追加（デフォルト）
-    // 非表示リストに入っていないものだけを追加
     for (var type in defaultStatuses) {
       if (hiddenDefaultTypes.contains(type)) continue;
 
@@ -107,6 +108,7 @@ class _FloatingStatusBubblesState extends State<FloatingStatusBubbles>
     required String id,
     bool isCustom = false
   }) {
+    // 全体的にサイズを小さくする (50-70程度)
     _bubbles.add(_BubbleModel(
       id: id,
       type: type,
@@ -117,57 +119,80 @@ class _FloatingStatusBubblesState extends State<FloatingStatusBubbles>
       // 有機的な動きのために速度と位相をランダム化
       dx: (_random.nextDouble() - 0.5) * 0.0015,
       dy: (_random.nextDouble() - 0.5) * 0.0015,
-      size: 70.0 + _random.nextDouble() * 20.0,
+      size: 50.0 + _random.nextDouble() * 20.0,
       phaseX: _random.nextDouble() * 2 * math.pi,
       phaseY: _random.nextDouble() * 2 * math.pi,
       wobbleSpeed: 0.5 + _random.nextDouble(),
     ));
   }
 
+  /// EmojiPickerを表示するモーダル
   Future<void> _showAddBubbleDialog() async {
-    final controller = TextEditingController();
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.white.withOpacity(0.9),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Add Bubble', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Enter one emoji:'),
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 32),
-              maxLength: 1, // 1文字制限（サロゲートペア対応が甘いが簡易実装）
-              decoration: const InputDecoration(
-                counterText: '',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, controller.text),
-            child: const Text('Add'),
-          ),
-        ],
-      ),
-    );
+    // キーボードが表示されるのを防ぐため、フォーカスを外す
+    FocusScope.of(context).unfocus();
 
-    if (result != null && result.isNotEmpty) {
-      final provider = context.read<StatusProvider>();
-      await provider.addCustomBubble(result);
-      _syncBubblesWithProvider(); // UI更新
-      setState(() {});
-    }
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.6,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
+            ),
+          ),
+          child: Column(
+            children: [
+              // ハンドルバー
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Expanded(
+                child: EmojiPicker(
+                  onEmojiSelected: (category, emoji) {
+                    Navigator.pop(context, emoji.emoji);
+                  },
+                  config: Config(
+                    height: 256,
+                    checkPlatformCompatibility: true,
+                    emojiViewConfig: EmojiViewConfig(
+                      columns: 7,
+                      emojiSizeMax: 32 * (foundation.defaultTargetPlatform == TargetPlatform.iOS ? 1.30 : 1.0),
+                    ),
+                    viewOrderConfig: const ViewOrderConfig(
+                      top: EmojiPickerItem.categoryBar,
+                      middle: EmojiPickerItem.searchBar,
+                      bottom: EmojiPickerItem.emojiView,
+                    ),
+                    skinToneConfig: const SkinToneConfig(),
+                    categoryViewConfig: const CategoryViewConfig(),
+                    bottomActionBarConfig: const BottomActionBarConfig(),
+                    searchViewConfig: const SearchViewConfig(),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    ).then((emoji) async {
+      if (emoji != null && emoji is String) {
+        final provider = context.read<StatusProvider>();
+        await provider.addCustomBubble(emoji);
+        _syncBubblesWithProvider();
+        setState(() {});
+      }
+    });
   }
 
   Future<void> _showDeleteConfirmDialog(_BubbleModel bubble) async {
@@ -175,7 +200,11 @@ class _FloatingStatusBubblesState extends State<FloatingStatusBubbles>
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Bubble?'),
-        content: Text(bubble.displayEmoji),
+        content: Text(
+          bubble.displayEmoji,
+          style: const TextStyle(fontSize: 32),
+          textAlign: TextAlign.center,
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -267,11 +296,13 @@ class _FloatingStatusBubblesState extends State<FloatingStatusBubbles>
                           HapticFeedback.heavyImpact();
                           _showDeleteConfirmDialog(bubble);
                         },
-                        child: _GlassBubbleWidget(
-                          emoji: bubble.displayEmoji,
-                          color: bubble.isCustom ? Colors.pinkAccent : bubble.type.color,
-                          size: bubble.size,
-                          isCurrent: isCurrent,
+                        child: _BouncingBubble(
+                          child: _GlassBubbleWidget(
+                            emoji: bubble.displayEmoji,
+                            color: bubble.isCustom ? Colors.pinkAccent : bubble.type.color,
+                            size: bubble.size,
+                            isCurrent: isCurrent,
+                          ),
                         ),
                       ),
                     );
@@ -287,10 +318,6 @@ class _FloatingStatusBubblesState extends State<FloatingStatusBubbles>
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // 復元ボタン（小さく表示、デフォルトバブルが隠されているときのみ表示すると良いが今回は常設またはロジック省略）
-                  // UIが煩雑になるため、今回は長押しで「復元」機能を隠しコマンド的に実装するか、
-                  // あるいは追加ダイアログの中に「Reset Defaults」を入れるのもあり。
-                  // ここではシンプルにFABの上に小さなボタンを置く。
                   FloatingActionButton.small(
                     heroTag: 'restore_btn',
                     backgroundColor: Colors.white.withOpacity(0.3),
@@ -342,6 +369,57 @@ class _FloatingStatusBubblesState extends State<FloatingStatusBubbles>
         bubble.y = bubble.y.clamp(0.0, 1.0);
       }
     }
+  }
+}
+
+/// タップ時にボヨンと弾むアニメーションラッパー
+class _BouncingBubble extends StatefulWidget {
+  final Widget child;
+
+  const _BouncingBubble({required this.child});
+
+  @override
+  State<_BouncingBubble> createState() => _BouncingBubbleState();
+}
+
+class _BouncingBubbleState extends State<_BouncingBubble> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 150),
+    );
+    _scaleAnimation = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.8), weight: 50),
+      TweenSequenceItem(tween: Tween(begin: 0.8, end: 1.1), weight: 30),
+      TweenSequenceItem(tween: Tween(begin: 1.1, end: 1.0), weight: 20),
+    ]).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => _controller.forward(from: 0),
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) {
+          return Transform.scale(
+            scale: _scaleAnimation.value,
+            child: widget.child,
+          );
+        },
+      ),
+    );
   }
 }
 
