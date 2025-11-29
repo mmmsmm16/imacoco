@@ -1,5 +1,5 @@
 import 'dart:math' as math;
-import 'dart:ui';
+import 'dart:ui' as ui;
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:flutter/foundation.dart' as foundation;
 import 'package:flutter/material.dart';
@@ -39,8 +39,8 @@ class _FloatingStatusBubblesState extends State<FloatingStatusBubbles>
   List<_BubbleModel> _bubbles = [];
   final math.Random _random = math.Random();
 
-  // バブルが画面外に行き過ぎないためのパディング率
-  static const double _padding = 0.1;
+  // 色キャッシュ
+  final Map<String, Color> _emojiColorCache = {};
 
   @override
   void initState() {
@@ -106,18 +106,44 @@ class _FloatingStatusBubblesState extends State<FloatingStatusBubbles>
     setState(() {});
   }
 
-  void _addBubble({
+  Future<void> _addBubble({
     UserStatusType type = UserStatusType.unknown,
     String? customEmoji,
     required String id,
     bool isCustom = false
-  }) {
+  }) async {
+    // 色の決定
+    Color bubbleColor = type.color;
+    if (isCustom && customEmoji != null) {
+      if (_emojiColorCache.containsKey(customEmoji)) {
+        bubbleColor = _emojiColorCache[customEmoji]!;
+      } else {
+        // 非同期で色を抽出するが、まずは仮の色（ハッシュベース）を設定して追加し、
+        // 後で抽出完了したら更新する
+        bubbleColor = _generateHashColor(customEmoji);
+        _extractColorFromEmoji(customEmoji).then((extractedColor) {
+          if (mounted) {
+            setState(() {
+              _emojiColorCache[customEmoji] = extractedColor;
+              // 既存のバブルの色を更新
+              for (var b in _bubbles) {
+                if (b.customEmoji == customEmoji) {
+                  b.overrideColor = extractedColor;
+                }
+              }
+            });
+          }
+        });
+      }
+    }
+
     // 全体的にサイズを小さくする (50-70程度)
     _bubbles.add(_BubbleModel(
       id: id,
       type: type,
       customEmoji: customEmoji,
       isCustom: isCustom,
+      overrideColor: isCustom ? bubbleColor : null,
       x: _random.nextDouble(),
       y: _random.nextDouble(),
       // 有機的な動きのために速度と位相をランダム化
@@ -128,6 +154,71 @@ class _FloatingStatusBubblesState extends State<FloatingStatusBubbles>
       phaseY: _random.nextDouble() * 2 * math.pi,
       wobbleSpeed: 0.5 + _random.nextDouble(),
     ));
+  }
+
+  /// 絵文字の文字列からハッシュベースの安全な色を生成する
+  Color _generateHashColor(String emoji) {
+    final hash = emoji.hashCode.abs(); // 負の値を防ぐ
+    final h = (hash % 360).toDouble();
+    final s = 0.5 + ((hash >> 8) % 40) / 100.0;
+    final v = 0.8 + ((hash >> 16) % 20) / 100.0;
+    return HSVColor.fromAHSV(1.0, h, s, v).toColor();
+  }
+
+  /// 絵文字を描画して平均色を抽出する
+  Future<Color> _extractColorFromEmoji(String emoji) async {
+    try {
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder);
+      final size = const Size(32, 32);
+
+      final textSpan = TextSpan(
+        text: emoji,
+        style: const TextStyle(fontSize: 28),
+      );
+      final textPainter = TextPainter(
+        text: textSpan,
+        textDirection: TextDirection.ltr,
+      );
+      textPainter.layout();
+
+      // 中心に描画
+      textPainter.paint(
+        canvas,
+        Offset(
+          (size.width - textPainter.width) / 2,
+          (size.height - textPainter.height) / 2
+        )
+      );
+
+      final picture = recorder.endRecording();
+      final img = await picture.toImage(size.width.toInt(), size.height.toInt());
+      final byteData = await img.toByteData(format: ui.ImageByteFormat.rawRgba);
+
+      if (byteData == null) return _generateHashColor(emoji);
+
+      final buffer = byteData.buffer.asUint8List();
+      int r = 0, g = 0, b = 0, count = 0;
+
+      // 全ピクセルを走査して平均を取る（透明度は考慮）
+      for (int i = 0; i < buffer.length; i += 4) {
+        final alpha = buffer[i + 3];
+        if (alpha > 50) { // ある程度不透明な部分のみ
+          r += buffer[i];
+          g += buffer[i + 1];
+          b += buffer[i + 2];
+          count++;
+        }
+      }
+
+      if (count > 0) {
+        return Color.fromARGB(255, r ~/ count, g ~/ count, b ~/ count);
+      }
+      return _generateHashColor(emoji);
+    } catch (e) {
+      debugPrint('Color extraction failed: $e');
+      return _generateHashColor(emoji);
+    }
   }
 
   /// EmojiPickerを表示するモーダル
@@ -270,21 +361,9 @@ class _FloatingStatusBubblesState extends State<FloatingStatusBubbles>
                         ? bubble.customEmoji == widget.currentCustomEmoji
                         : bubble.type == widget.currentStatus && widget.currentCustomEmoji == null;
 
-                    // カスタム絵文字の色生成ロジック
-                    // 絵文字のハッシュコードを使って一意な色を生成する
-                    Color bubbleColor;
-                    if (bubble.isCustom) {
-                      // ハッシュコードをシードにしてランダムなパステルカラーを生成
-                      final hash = bubble.customEmoji.hashCode;
-                      // H: 0-360, S: 0.5-0.8, V: 0.8-1.0
-                      // あまり暗くならないように調整
-                      final h = (hash % 360).toDouble();
-                      final s = 0.5 + ((hash >> 8) % 40) / 100.0; // 0.5-0.9
-                      final v = 0.8 + ((hash >> 16) % 20) / 100.0; // 0.8-1.0
-                      bubbleColor = HSVColor.fromAHSV(1.0, h, s, v).toColor();
-                    } else {
-                      bubbleColor = bubble.type.color;
-                    }
+                    final bubbleColor = bubble.isCustom
+                        ? (bubble.overrideColor ?? Colors.pinkAccent)
+                        : bubble.type.color;
 
                     return Positioned(
                       left: bubble.x * (constraints.maxWidth - bubble.size),
@@ -309,8 +388,8 @@ class _FloatingStatusBubblesState extends State<FloatingStatusBubbles>
                         onPanUpdate: (details) {
                           // 指の動きに合わせて速度を更新（弾く動き）
                           // 画面サイズに対する相対速度に変換
-                          // 係数を調整して「飛び」具合を調整
-                          final sensitivity = 0.0001;
+                          // 係数をかなり大きくして「飛ぶ」感覚を作る (0.0001 -> 0.003)
+                          final sensitivity = 0.003;
                           bubble.dx = details.delta.dx * sensitivity;
                           bubble.dy = details.delta.dy * sensitivity;
 
@@ -375,8 +454,7 @@ class _FloatingStatusBubblesState extends State<FloatingStatusBubbles>
       bubble.x += bubble.dx;
       bubble.y += bubble.dy;
 
-      // 摩擦（減衰）を追加して、弾いた後に徐々に元の速度感に戻るようにする
-      // ただし完全停止はさせず、漂う動きは残す
+      // 摩擦（減衰）
       bubble.dx *= 0.98; // 減衰
       bubble.dy *= 0.98; // 減衰
 
@@ -476,6 +554,7 @@ class _BubbleModel {
   final UserStatusType type;
   final String? customEmoji;
   final bool isCustom;
+  Color? overrideColor; // 抽出した色を保持
 
   double x;
   double y;
@@ -493,6 +572,7 @@ class _BubbleModel {
     required this.type,
     this.customEmoji,
     required this.isCustom,
+    this.overrideColor,
     required this.x,
     required this.y,
     required this.dx,
