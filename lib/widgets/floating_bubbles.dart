@@ -284,7 +284,7 @@ class _FloatingStatusBubblesState extends State<FloatingStatusBubbles>
                     return Positioned(
                       left: bubble.x * (constraints.maxWidth - bubble.size),
                       top: bubble.y * (constraints.maxHeight - bubble.size),
-                      child: GestureDetector(
+                      child: _BouncingBubble(
                         onTap: () {
                           HapticFeedback.mediumImpact();
                           widget.onStatusSelected(
@@ -296,13 +296,11 @@ class _FloatingStatusBubblesState extends State<FloatingStatusBubbles>
                           HapticFeedback.heavyImpact();
                           _showDeleteConfirmDialog(bubble);
                         },
-                        child: _BouncingBubble(
-                          child: _GlassBubbleWidget(
-                            emoji: bubble.displayEmoji,
-                            color: bubble.isCustom ? Colors.pinkAccent : bubble.type.color,
-                            size: bubble.size,
-                            isCurrent: isCurrent,
-                          ),
+                        child: _GlassBubbleWidget(
+                          emoji: bubble.displayEmoji,
+                          color: bubble.isCustom ? Colors.pinkAccent : bubble.type.color,
+                          size: bubble.size,
+                          isCurrent: isCurrent,
                         ),
                       ),
                     );
@@ -375,8 +373,14 @@ class _FloatingStatusBubblesState extends State<FloatingStatusBubbles>
 /// タップ時にボヨンと弾むアニメーションラッパー
 class _BouncingBubble extends StatefulWidget {
   final Widget child;
+  final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
 
-  const _BouncingBubble({required this.child});
+  const _BouncingBubble({
+    required this.child,
+    this.onTap,
+    this.onLongPress,
+  });
 
   @override
   State<_BouncingBubble> createState() => _BouncingBubbleState();
@@ -410,6 +414,8 @@ class _BouncingBubbleState extends State<_BouncingBubble> with SingleTickerProvi
   Widget build(BuildContext context) {
     return GestureDetector(
       onTapDown: (_) => _controller.forward(from: 0),
+      onTap: widget.onTap,
+      onLongPress: widget.onLongPress,
       child: AnimatedBuilder(
         animation: _controller,
         builder: (context, child) {
