@@ -166,17 +166,9 @@ class _FloatingStatusBubblesState extends State<FloatingStatusBubbles>
                   onEmojiSelected: (category, emoji) {
                     Navigator.pop(context, emoji.emoji);
                   },
-                  config: Config(
-                    height: 256,
-                    checkPlatformCompatibility: true,
-                    // Version 4.4.0 specific config (using safe parameters)
-                    columns: 7,
-                    emojiSizeMax: 32 * (foundation.defaultTargetPlatform == TargetPlatform.iOS ? 1.30 : 1.0),
-                    verticalSpacing: 0,
-                    horizontalSpacing: 0,
-                    gridPadding: EdgeInsets.zero,
-                    initCategory: Category.RECENT,
-                    bgColor: const Color(0xFFF2F2F2),
+                  config: const Config(
+                    // バージョン互換性のため最小限の設定にする
+                    bgColor: Color(0xFFF2F2F2),
                     indicatorColor: Colors.blue,
                     iconColor: Colors.grey,
                     iconColorSelected: Colors.blue,
@@ -186,17 +178,7 @@ class _FloatingStatusBubblesState extends State<FloatingStatusBubbles>
                     enableSkinTones: true,
                     showRecentsTab: true,
                     recentsLimit: 28,
-                    replaceEmojiOnLimitExceed: false,
-                    noRecents: const Text(
-                      'No Recents',
-                      style: TextStyle(fontSize: 20, color: Colors.black26),
-                      textAlign: TextAlign.center,
-                    ),
-                    loadingIndicator: const SizedBox.shrink(),
-                    tabIndicatorAnimDuration: kTabScrollDuration,
-                    categoryIcons: const CategoryIcons(),
-                    buttonMode: ButtonMode.MATERIAL,
-                    check: true,
+                    // columns, height等はデフォルト値を使用、または親Widgetの制約に従う
                   ),
                 ),
               ),
