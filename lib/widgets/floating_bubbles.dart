@@ -445,6 +445,80 @@ class _FloatingStatusBubblesState extends State<FloatingStatusBubbles>
   }
 
   void _updatePositions(double width, double height) {
+    // 衝突判定と反発ロジック
+    // すべてのバブルのペアに対してチェック
+    for (int i = 0; i < _bubbles.length; i++) {
+      for (int j = i + 1; j < _bubbles.length; j++) {
+        final b1 = _bubbles[i];
+        final b2 = _bubbles[j];
+
+        // 相対位置の計算（画面サイズで正規化された座標を使用）
+        // 実際のピクセル座標での距離を計算するために width/height を掛ける
+        final dx = (b2.x - b1.x) * (width - b1.size);
+        // 簡易的に b1.size で計算しているが、正確にはそれぞれのサイズ差も考慮すべきだが、
+        // width - size は「可動域」なので、座標系が少し歪む。
+        // ここでは単純化のため、画面アスペクト比を無視して 0.0-1.0 空間で考えるか、
+        // ピクセル空間に展開して計算するのが正しい。
+
+        // ピクセル空間での中心座標
+        final c1x = b1.x * (width - b1.size) + b1.size / 2;
+        final c1y = b1.y * (height - b1.size) + b1.size / 2;
+        final c2x = b2.x * (width - b2.size) + b2.size / 2;
+        final c2y = b2.y * (height - b2.size) + b2.size / 2;
+
+        final distSq = (c1x - c2x) * (c1x - c2x) + (c1y - c2y) * (c1y - c2y);
+        final radiusSum = (b1.size / 2) + (b2.size / 2);
+
+        // 衝突判定 (距離の二乗 < 半径の和の二乗)
+        if (distSq < radiusSum * radiusSum) {
+          final dist = math.sqrt(distSq);
+          if (dist == 0) continue; // 重なりすぎ
+
+          // 衝突法線ベクトル
+          final nx = (c2x - c1x) / dist;
+          final ny = (c2y - c1y) / dist;
+
+          // 相対速度
+          final dvx = b2.dx - b1.dx;
+          final dvy = b2.dy - b1.dy;
+
+          // 法線方向の相対速度
+          final velAlongNormal = dvx * nx + dvy * ny;
+
+          // 離れようとしている場合は何もしない
+          if (velAlongNormal > 0) continue;
+
+          // 反発係数 (1.0 = 完全弾性, 少し減衰させる)
+          const restitution = 0.8;
+
+          // 衝撃の強さ (質量は同じと仮定)
+          final j = -(1 + restitution) * velAlongNormal;
+          final impulse = j / 2; // 質量1同士なら2で割る
+
+          // 速度更新
+          // b1 は逆方向へ
+          b1.dx -= impulse * nx;
+          b1.dy -= impulse * ny;
+          // b2 は順方向へ
+          b2.dx += impulse * nx;
+          b2.dy += impulse * ny;
+
+          // 位置補正 (めり込み防止)
+          // 衝突した分だけ押し戻す
+          final overlap = radiusSum - dist;
+          final separationX = nx * overlap * 0.5; // 半分ずつ動かす
+          final separationY = ny * overlap * 0.5;
+
+          // ピクセル単位の移動量を 0.0-1.0 空間に戻して反映
+          // ただし width - size で割る必要があるため概算
+          b1.x -= separationX / (width - b1.size);
+          b1.y -= separationY / (height - b1.size);
+          b2.x += separationX / (width - b2.size);
+          b2.y += separationY / (height - b2.size);
+        }
+      }
+    }
+
     for (var bubble in _bubbles) {
       // 有機的な動き（パーリンノイズ的アプローチの簡易版）
       // 時間経過とともに位相をずらす
