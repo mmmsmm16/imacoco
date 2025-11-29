@@ -79,17 +79,27 @@ class FirebaseService {
   /// 自分のステータスを更新します。
   ///
   /// Firestore上のユーザードキュメントのステータスと更新日時を更新します。
+  /// カスタム絵文字が指定された場合はそれも保存します。
   ///
   /// Args:
   ///   type: 新しいステータスの種類。
-  Future<void> updateStatus(UserStatusType type) async {
+  ///   customEmoji: カスタム絵文字（省略可）。
+  Future<void> updateStatus(UserStatusType type, {String? customEmoji}) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return;
 
-    await _usersRef.doc(uid).update({
+    final data = <String, dynamic>{
       'statusType': type.index,
       'updatedAt': FieldValue.serverTimestamp(),
-    });
+      'customEmoji': customEmoji, // nullの場合フィールドを削除するかnullをセットするかは要件次第だが、null更新で消える挙動を期待
+    };
+
+    // null値はFirestoreのフィールド削除として扱うか、明示的にFieldValue.delete()を使うべき場合もあるが
+    // ここでは上書き更新としてnull許容でセットする。
+    // もし明示的に消したい場合はFieldValue.delete()を使う必要があるが、
+    // 基本的に上書きでOK。customEmojiが指定されていない場合はnullで上書きして消す。
+
+    await _usersRef.doc(uid).set(data, SetOptions(merge: true));
   }
 
   /// ユーザー名を更新します（オプション機能）。
@@ -122,6 +132,7 @@ class FirebaseService {
     final statusIndex = data['statusType'] as int? ?? 0;
     final timestamp = data['updatedAt'] as Timestamp?;
     final updatedAt = timestamp?.toDate() ?? DateTime.now();
+    final customEmoji = data['customEmoji'] as String?;
 
     return app_models.User(
       id: uid,
@@ -129,6 +140,7 @@ class FirebaseService {
       status: UserStatus(
         type: UserStatusType.values[statusIndex],
         updatedAt: updatedAt,
+        customEmoji: customEmoji,
       ),
     );
   }
