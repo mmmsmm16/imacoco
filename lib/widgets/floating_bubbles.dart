@@ -166,28 +166,8 @@ class _FloatingStatusBubblesState extends State<FloatingStatusBubbles>
                   onEmojiSelected: (category, emoji) {
                     Navigator.pop(context, emoji.emoji);
                   },
-                  config: const Config(
-                    // バージョン4.4.0互換の最小限設定
-                    // columns, height, bgColorなどを削除しデフォルトに任せる
-                    initCategory: Category.RECENT,
-                    indicatorColor: Colors.blue,
-                    iconColor: Colors.grey,
-                    iconColorSelected: Colors.blue,
-                    backspaceColor: Colors.blue,
-                    skinToneDialogBgColor: Colors.white,
-                    skinToneIndicatorColor: Colors.grey,
-                    enableSkinTones: true,
-                    showRecentsTab: true,
-                    recentsLimit: 28,
-                    replaceEmojiOnLimitExceed: false,
-                    noRecents: Text(
-                      'No Recents',
-                      style: TextStyle(fontSize: 20, color: Colors.black26),
-                      textAlign: TextAlign.center,
-                    ),
-                    categoryIcons: CategoryIcons(),
-                    buttonMode: ButtonMode.MATERIAL,
-                  ),
+                  // エラー回避のためデフォルト設定を使用
+                  config: const Config(),
                 ),
               ),
             ],
