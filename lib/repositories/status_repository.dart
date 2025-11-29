@@ -49,8 +49,9 @@ class StatusRepository {
   ///
   /// Args:
   ///   type: 新しいステータスの種類。
-  Future<void> updateMyStatus(UserStatusType type) async {
-    await _firebaseService.updateStatus(type);
+  ///   customEmoji: カスタム絵文字（省略可）。
+  Future<void> updateMyStatus(UserStatusType type, {String? customEmoji}) async {
+    await _firebaseService.updateStatus(type, customEmoji: customEmoji);
   }
 
   /// リソースを解放します。
