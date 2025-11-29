@@ -63,8 +63,9 @@ class HomeScreen extends StatelessWidget {
                     ? const Center(child: CircularProgressIndicator())
                     : FloatingStatusBubbles(
                         currentStatus: currentUser.status.type,
-                        onStatusSelected: (type) {
-                          statusProvider.updateStatus(type);
+                        currentCustomEmoji: currentUser.status.customEmoji,
+                        onStatusSelected: (type, customEmoji) {
+                          statusProvider.updateStatus(type, customEmoji: customEmoji);
                         },
                       ),
               ),

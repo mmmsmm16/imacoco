@@ -103,7 +103,8 @@ class FriendCard extends StatelessWidget {
                                 ],
                               ),
                               child: Text(
-                                displayType.emoji,
+                                // カスタム絵文字があればそれを優先して表示
+                                status.displayEmoji,
                                 style: const TextStyle(fontSize: 18),
                               ),
                             ),
