@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 /// ユーザーの現在の状態を表す列挙型。
 ///
 /// - [unknown]: 不明（初期状態または期限切れ）
@@ -17,12 +19,9 @@ enum UserStatusType {
 
 /// [UserStatusType] に対する拡張メソッド。
 ///
-/// 表示用の絵文字やラベルを取得する機能を提供します。
+/// 表示用の絵文字、ラベル、テーマカラーを取得する機能を提供します。
 extension UserStatusTypeExtension on UserStatusType {
   /// ステータスに対応する絵文字を取得します。
-  ///
-  /// Returns:
-  ///   ステータスを表す絵文字（String）。
   String get emoji {
     switch (this) {
       case UserStatusType.awake:
@@ -42,9 +41,6 @@ extension UserStatusTypeExtension on UserStatusType {
   }
 
   /// ステータスに対応する日本語ラベルを取得します。
-  ///
-  /// Returns:
-  ///   ステータスを表す日本語ラベル（String）。
   String get label {
     switch (this) {
       case UserStatusType.awake:
@@ -60,6 +56,26 @@ extension UserStatusTypeExtension on UserStatusType {
       case UserStatusType.unknown:
       default:
         return '不明';
+    }
+  }
+
+  /// ステータスに対応するテーマカラーを取得します。
+  /// UIでの背景色やアクセントカラーとして使用します。
+  Color get color {
+    switch (this) {
+      case UserStatusType.awake:
+        return Colors.orangeAccent;
+      case UserStatusType.eating:
+        return Colors.lightGreen;
+      case UserStatusType.free:
+        return Colors.lightBlueAccent;
+      case UserStatusType.busy:
+        return Colors.redAccent;
+      case UserStatusType.gaming:
+        return Colors.purpleAccent;
+      case UserStatusType.unknown:
+      default:
+        return Colors.grey;
     }
   }
 }

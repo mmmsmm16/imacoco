@@ -66,4 +66,5 @@ lib/generated_plugin_registrant.dart
 !**/android/**/build.gradle
 !**/android/app/src/main/AndroidManifest.xml
 
+# Firebase config (private)
 lib/firebase_options.dart
