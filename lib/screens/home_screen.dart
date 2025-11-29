@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // HapticFeedback用
 import 'package:provider/provider.dart';
+import 'dart:math' as math; // アニメーション計算用
 import '../models/user_status.dart';
 import '../providers/status_provider.dart';
 import '../widgets/floating_bubbles.dart';
@@ -197,6 +199,7 @@ class _FriendListSection extends StatelessWidget {
     );
   }
 
+  /// 更新日時を見やすい形式にフォーマットするヘルパーメソッド。
   String _formatTime(DateTime dt) {
     final diff = DateTime.now().difference(dt);
     if (diff.inMinutes < 1) return 'たった今';
