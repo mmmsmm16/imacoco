@@ -21,7 +21,8 @@ enum UserStatusType {
 ///
 /// 表示用の絵文字、ラベル、テーマカラーを取得する機能を提供します。
 extension UserStatusTypeExtension on UserStatusType {
-  /// ステータスに対応する絵文字を取得します。
+  /// ステータスに対応するデフォルトの絵文字を取得します。
+  /// カスタム絵文字がある場合は、UserStatusクラスのプロパティを優先してください。
   String get emoji {
     switch (this) {
       case UserStatusType.awake:
@@ -124,11 +125,14 @@ class UserStatus {
   /// ステータスが更新された日時
   final DateTime updatedAt;
 
+  /// カスタム絵文字（任意）
+  /// これが設定されている場合、[type] の絵文字の代わりに使用します。
+  final String? customEmoji;
+
   /// ステータスの有効期限（1時間）
   static const Duration expirationDuration = Duration(hours: 1);
 
-  /// UIで選択可能なステータスのリスト。
-  /// 将来的にアイコンを増やしたい場合はここに追加する。
+  /// UIで選択可能なデフォルトステータスのリスト。
   static const List<UserStatusType> selectableStatuses = [
     UserStatusType.awake,
     UserStatusType.eating,
@@ -142,10 +146,16 @@ class UserStatus {
   /// Args:
   ///   type: ステータスの種類。
   ///   updatedAt: 更新日時。
+  ///   customEmoji: カスタム絵文字（省略可）。
   const UserStatus({
     required this.type,
     required this.updatedAt,
+    this.customEmoji,
   });
+
+  /// 表示用の絵文字を取得します。
+  /// カスタム絵文字があればそれを、なければタイプに応じたデフォルト絵文字を返します。
+  String get displayEmoji => customEmoji ?? type.emoji;
 
   /// 「不明」状態のインスタンスを作成するファクトリメソッド。
   ///
@@ -165,16 +175,31 @@ class UserStatus {
   /// Args:
   ///   type: 新しいステータスの種類（省略時は現在の値）。
   ///   updatedAt: 新しい更新日時（省略時は現在の値）。
+  ///   customEmoji: 新しいカスタム絵文字（省略時は現在の値）。nullを渡した場合は維持されるため、消去するには明示的なロジックが必要。
   ///
   /// Returns:
   ///   新しい UserStatus インスタンス。
   UserStatus copyWith({
     UserStatusType? type,
     DateTime? updatedAt,
+    String? customEmoji,
   }) {
     return UserStatus(
       type: type ?? this.type,
       updatedAt: updatedAt ?? this.updatedAt,
+      customEmoji: customEmoji ?? this.customEmoji,
+    );
+  }
+
+  /// カスタム絵文字をクリアしてコピーを作成するためのメソッド
+  UserStatus copyWithClearCustomEmoji({
+    UserStatusType? type,
+    DateTime? updatedAt,
+  }) {
+    return UserStatus(
+      type: type ?? this.type,
+      updatedAt: updatedAt ?? this.updatedAt,
+      customEmoji: null,
     );
   }
 
