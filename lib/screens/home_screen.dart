@@ -2,170 +2,194 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/user_status.dart';
 import '../providers/status_provider.dart';
+import '../widgets/floating_bubbles.dart';
 
+/// アプリのメイン画面（ホーム画面）。
+///
+/// 自分のステータス更新セクションと、友達のステータスリストセクションを表示します。
+/// 画面全体の背景色は選択されたステータスに応じて変化します。
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Imacoco'),
-        centerTitle: true,
-        elevation: 0,
-      ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const _MyStatusSection(),
-          const Divider(height: 32, thickness: 1),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Text(
-              'みんなの様子',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Colors.white70,
-                  ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Expanded(child: _FriendListSection()),
-        ],
-      ),
-    );
-  }
-}
-
-class _MyStatusSection extends StatelessWidget {
-  const _MyStatusSection();
 
   @override
   Widget build(BuildContext context) {
     final statusProvider = context.watch<StatusProvider>();
     final currentUser = statusProvider.currentUser;
 
-    if (currentUser == null) {
-      return const SizedBox(height: 200, child: Center(child: CircularProgressIndicator()));
-    }
+    // 背景グラデーションの取得（ユーザー未ロード時はデフォルト）
+    final bgColors = currentUser?.status.type.backgroundColors ??
+        UserStatusType.unknown.backgroundColors;
 
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        children: [
-          Text(
-            '今の気分は？',
-            style: Theme.of(context).textTheme.headlineSmall,
+    // テキスト色の判定
+    final isLight = currentUser?.status.type.isLightBackground ?? false;
+    final textColor = isLight ? Colors.black87 : Colors.white;
+    final subTextColor = isLight ? Colors.black54 : Colors.white70;
+
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        title: Text(
+          'Imacoco',
+          style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+      ),
+      body: AnimatedContainer(
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: bgColors,
           ),
-          const SizedBox(height: 8),
-          Text(
-            '${currentUser.status.type.emoji} ${currentUser.status.type.label}',
-            style: Theme.of(context).textTheme.displayMedium,
-          ),
-          const SizedBox(height: 24),
-          Wrap(
-            spacing: 16,
-            runSpacing: 16,
-            alignment: WrapAlignment.center,
+        ),
+        child: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _StatusButton(type: UserStatusType.awake),
-              _StatusButton(type: UserStatusType.eating),
-              _StatusButton(type: UserStatusType.free),
-              _StatusButton(type: UserStatusType.busy),
-              _StatusButton(type: UserStatusType.gaming),
+              // ステータス変更エリア（浮遊バブルUI）
+              Expanded(
+                flex: 4, // 画面の4割くらいを浮遊エリアに
+                child: currentUser == null
+                    ? const Center(child: CircularProgressIndicator())
+                    : FloatingStatusBubbles(
+                        currentStatus: currentUser.status.type,
+                        onStatusSelected: (type) {
+                          statusProvider.updateStatus(type);
+                        },
+                      ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // 友達リストのヘッダー
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Row(
+                  children: [
+                    Icon(Icons.people_outline, color: subTextColor, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      'みんなの様子',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: subTextColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              // 友達リスト（下半分）
+              Expanded(
+                flex: 5, // 画面の5割くらいをリストに
+                child: _FriendListSection(
+                  textColor: textColor,
+                  subTextColor: subTextColor,
+                ),
+              ),
             ],
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatusButton extends StatelessWidget {
-  final UserStatusType type;
-
-  const _StatusButton({required this.type});
-
-  @override
-  Widget build(BuildContext context) {
-    final statusProvider = context.read<StatusProvider>();
-    final isSelected = statusProvider.currentUser?.status.type == type;
-
-    return InkWell(
-      onTap: () => statusProvider.updateStatus(type),
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        width: 70,
-        height: 70,
-        decoration: BoxDecoration(
-          color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey[800],
-          borderRadius: BorderRadius.circular(16),
-          border: isSelected ? Border.all(color: Colors.white, width: 2) : null,
-          boxShadow: [
-            if (isSelected)
-              BoxShadow(
-                color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
-                blurRadius: 8,
-                spreadRadius: 2,
-              )
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(type.emoji, style: const TextStyle(fontSize: 28)),
-            const SizedBox(height: 4),
-            Text(
-              type.label,
-              style: const TextStyle(fontSize: 10, color: Colors.white),
-            ),
-          ],
         ),
       ),
     );
   }
 }
 
+/// 友達（他ユーザー）のステータスリストを表示するセクション。
 class _FriendListSection extends StatelessWidget {
-  const _FriendListSection();
+  final Color textColor;
+  final Color subTextColor;
+
+  const _FriendListSection({required this.textColor, required this.subTextColor});
 
   @override
   Widget build(BuildContext context) {
     final friends = context.watch<StatusProvider>().friends;
 
-    if (friends.isEmpty) {
-      return const Center(child: Text('まだ誰もいません'));
+    // ソート処理
+    final sortedFriends = List.of(friends);
+    sortedFriends.sort((a, b) {
+      final aIsUnknown = a.status.isExpired || a.status.type == UserStatusType.unknown;
+      final bIsUnknown = b.status.isExpired || b.status.type == UserStatusType.unknown;
+
+      if (aIsUnknown && !bIsUnknown) return 1;
+      if (!aIsUnknown && bIsUnknown) return -1;
+      return b.status.updatedAt.compareTo(a.status.updatedAt);
+    });
+
+    if (sortedFriends.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.nights_stay_outlined, size: 48, color: subTextColor.withOpacity(0.3)),
+            const SizedBox(height: 16),
+            Text('まだ誰もいません', style: TextStyle(color: subTextColor.withOpacity(0.5))),
+          ],
+        ),
+      );
     }
 
     return ListView.builder(
-      itemCount: friends.length,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: sortedFriends.length,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       itemBuilder: (context, index) {
-        final friend = friends[index];
-        // Check if status is expired (older than 1 hour)
-        final isExpired = DateTime.now().difference(friend.status.updatedAt).inHours >= 1;
-        // If expired or explicitly unknown, treat as unknown
+        final friend = sortedFriends[index];
+        final isExpired = friend.status.isExpired;
+
         final displayStatusType = (isExpired || friend.status.type == UserStatusType.unknown)
             ? UserStatusType.unknown
             : friend.status.type;
         
         final isUnknown = displayStatusType == UserStatusType.unknown;
+        final statusColor = displayStatusType.color;
 
-        return Card(
-          color: Colors.grey[900],
-          margin: const EdgeInsets.only(bottom: 8),
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: isUnknown ? Colors.grey : Theme.of(context).colorScheme.secondary,
-              child: Text(friend.name[0]),
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            color: Colors.white.withOpacity(0.1), // 半透明ベース
+            border: Border.all(
+              color: isUnknown ? Colors.grey.withOpacity(0.2) : statusColor.withOpacity(0.5),
+              width: 1,
             ),
-            title: Text(friend.name),
+          ),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            leading: CircleAvatar(
+              backgroundColor: isUnknown ? Colors.grey.withOpacity(0.5) : statusColor,
+              foregroundColor: Colors.white,
+              child: Text(friend.name.isNotEmpty ? friend.name[0] : '?'),
+            ),
+            title: Text(
+              friend.name,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: textColor,
+              ),
+            ),
             subtitle: Text(
               isExpired ? '1時間以上前' : _formatTime(friend.status.updatedAt),
-              style: const TextStyle(fontSize: 12),
+              style: TextStyle(
+                fontSize: 12,
+                color: subTextColor,
+              ),
             ),
-            trailing: Text(
-              displayStatusType.emoji,
-              style: const TextStyle(fontSize: 32),
+            trailing: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.black12,
+                shape: BoxShape.circle,
+              ),
+              child: Text(
+                displayStatusType.emoji,
+                style: const TextStyle(fontSize: 28),
+              ),
             ),
           ),
         );
