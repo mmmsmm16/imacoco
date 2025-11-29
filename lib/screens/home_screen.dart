@@ -1,43 +1,151 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // HapticFeedback用
 import 'package:provider/provider.dart';
+import 'dart:math' as math; // アニメーション計算用
 import '../models/user_status.dart';
 import '../providers/status_provider.dart';
 
+/// アプリのメイン画面（ホーム画面）。
+///
+/// 自分のステータス更新セクションと、友達のステータスリストセクションを表示します。
+/// 画面全体の背景色は選択されたステータスに応じて変化します。
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final statusProvider = context.watch<StatusProvider>();
+    final currentUser = statusProvider.currentUser;
+
+    // 背景グラデーションの取得（ユーザー未ロード時はデフォルト）
+    final bgColors = currentUser?.status.type.backgroundColors ??
+        UserStatusType.unknown.backgroundColors;
+
+    // テキスト色の判定
+    final isLight = currentUser?.status.type.isLightBackground ?? false;
+    final textColor = isLight ? Colors.black87 : Colors.white;
+    final subTextColor = isLight ? Colors.black54 : Colors.white70;
+
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('Imacoco'),
+        title: Text(
+          'Imacoco',
+          style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
         elevation: 0,
+        backgroundColor: Colors.transparent,
+        systemOverlayStyle: isLight ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light,
       ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const _MyStatusSection(),
-          const Divider(height: 32, thickness: 1),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Text(
-              'みんなの様子',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Colors.white70,
-                  ),
-            ),
+      body: AnimatedContainer(
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: bgColors,
           ),
-          const SizedBox(height: 8),
-          const Expanded(child: _FriendListSection()),
-        ],
+        ),
+        child: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // ステータス変更ヘッダー（インタラクティブメニュー）
+              _InteractiveStatusHeader(textColor: textColor),
+
+              const SizedBox(height: 16),
+
+              // 友達リストのヘッダー
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Row(
+                  children: [
+                    Icon(Icons.people_outline, color: subTextColor, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      'みんなの様子',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: subTextColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              // 友達リスト（expanded）
+              Expanded(child: _FriendListSection(textColor: textColor, subTextColor: subTextColor)),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
-class _MyStatusSection extends StatelessWidget {
-  const _MyStatusSection();
+/// インタラクティブなステータス変更ヘッダー。
+///
+/// 通常時は現在のステータスのみを表示し、タップするとメニューが展開します。
+class _InteractiveStatusHeader extends StatefulWidget {
+  final Color textColor;
+
+  const _InteractiveStatusHeader({required this.textColor});
+
+  @override
+  State<_InteractiveStatusHeader> createState() => _InteractiveStatusHeaderState();
+}
+
+class _InteractiveStatusHeaderState extends State<_InteractiveStatusHeader>
+    with SingleTickerProviderStateMixin {
+  bool _isExpanded = false;
+  late AnimationController _controller;
+  late Animation<double> _expandAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    _expandAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.elasticOut,
+      reverseCurve: Curves.easeIn,
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _toggleMenu() {
+    HapticFeedback.lightImpact();
+    setState(() {
+      _isExpanded = !_isExpanded;
+      if (_isExpanded) {
+        _controller.forward();
+      } else {
+        _controller.reverse();
+      }
+    });
+  }
+
+  Future<void> _updateStatus(UserStatusType type) async {
+    HapticFeedback.mediumImpact();
+    final provider = context.read<StatusProvider>();
+
+    // メニューを閉じる
+    _toggleMenu();
+
+    // ステータス更新
+    await provider.updateStatus(type);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -45,127 +153,262 @@ class _MyStatusSection extends StatelessWidget {
     final currentUser = statusProvider.currentUser;
 
     if (currentUser == null) {
-      return const SizedBox(height: 200, child: Center(child: CircularProgressIndicator()));
+      return const SizedBox(height: 150, child: Center(child: CircularProgressIndicator()));
     }
 
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        children: [
-          Text(
-            '今の気分は？',
-            style: Theme.of(context).textTheme.headlineSmall,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '${currentUser.status.type.emoji} ${currentUser.status.type.label}',
-            style: Theme.of(context).textTheme.displayMedium,
-          ),
-          const SizedBox(height: 24),
-          Wrap(
-            spacing: 16,
-            runSpacing: 16,
-            alignment: WrapAlignment.center,
-            children: [
-              _StatusButton(type: UserStatusType.awake),
-              _StatusButton(type: UserStatusType.eating),
-              _StatusButton(type: UserStatusType.free),
-              _StatusButton(type: UserStatusType.busy),
-              _StatusButton(type: UserStatusType.gaming),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
+    final currentType = currentUser.status.type;
 
-class _StatusButton extends StatelessWidget {
-  final UserStatusType type;
-
-  const _StatusButton({required this.type});
-
-  @override
-  Widget build(BuildContext context) {
-    final statusProvider = context.read<StatusProvider>();
-    final isSelected = statusProvider.currentUser?.status.type == type;
-
-    return InkWell(
-      onTap: () => statusProvider.updateStatus(type),
-      borderRadius: BorderRadius.circular(16),
+    return GestureDetector(
+      onTap: _isExpanded ? _toggleMenu : null, // 展開中は背景タップで閉じる
+      behavior: HitTestBehavior.translucent,
       child: Container(
-        width: 70,
-        height: 70,
-        decoration: BoxDecoration(
-          color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey[800],
-          borderRadius: BorderRadius.circular(16),
-          border: isSelected ? Border.all(color: Colors.white, width: 2) : null,
-          boxShadow: [
-            if (isSelected)
-              BoxShadow(
-                color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
-                blurRadius: 8,
-                spreadRadius: 2,
-              )
-          ],
-        ),
+        padding: const EdgeInsets.symmetric(vertical: 20),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Text(type.emoji, style: const TextStyle(fontSize: 28)),
-            const SizedBox(height: 4),
-            Text(
-              type.label,
-              style: const TextStyle(fontSize: 10, color: Colors.white),
+            // メインのステータス表示（またはメニュー中心）
+            SizedBox(
+              height: 220, // メニュー展開用のスペース確保
+              child: Stack(
+                alignment: Alignment.center,
+                clipBehavior: Clip.none,
+                children: [
+                  // 展開されるメニュー項目
+                  ..._buildMenuItems(currentType),
+
+                  // 中央の現在のステータス（トリガーボタン）
+                  GestureDetector(
+                    onTap: _toggleMenu,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      width: 100,
+                      height: 100,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: _isExpanded
+                            ? Colors.white.withOpacity(0.9)
+                            : currentType.color.withOpacity(0.3),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: _isExpanded
+                              ? Colors.grey.withOpacity(0.5)
+                              : currentType.color.withOpacity(0.8),
+                          width: 2,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: currentType.color.withOpacity(0.4),
+                            blurRadius: _isExpanded ? 30 : 20,
+                            spreadRadius: _isExpanded ? 10 : 5,
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Text(
+                          _isExpanded ? '❌' : currentType.emoji,
+                          style: const TextStyle(fontSize: 48),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // ステータスラベル（削除済みだが、タップ誘導のテキストは残すかどうか）
+            // ユーザー要望によりステータス名は削除。
+            // 誘導テキストのみフェード表示
+            AnimatedOpacity(
+              opacity: _isExpanded ? 0.0 : 1.0,
+              duration: const Duration(milliseconds: 200),
+              child: Column(
+                children: [
+                  const SizedBox(height: 8),
+                  Text(
+                    'Tap to change', // 英語または日本語でシンプルに
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: widget.textColor.withOpacity(0.5),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
       ),
     );
   }
+
+  List<Widget> _buildMenuItems(UserStatusType currentType) {
+    // 定義された選択可能なステータスを取得
+    final options = UserStatus.selectableStatuses;
+
+    const double radius = 90.0;
+    // アイテムを円周上に配置 (-90度 = 上 からスタート)
+    const double startAngle = -math.pi / 2;
+    final double step = (2 * math.pi) / options.length;
+
+    return List.generate(options.length, (index) {
+      final type = options[index];
+      final angle = startAngle + (step * index);
+
+      return AnimatedBuilder(
+        animation: _expandAnimation,
+        builder: (context, child) {
+          return Transform.translate(
+            offset: Offset(
+              radius * _expandAnimation.value * math.cos(angle),
+              radius * _expandAnimation.value * math.sin(angle),
+            ),
+            child: Opacity(
+              opacity: _expandAnimation.value,
+              child: Transform.scale(
+                scale: _expandAnimation.value,
+                child: _MenuItemButton(
+                  type: type,
+                  isSelected: type == currentType,
+                  onTap: () => _updateStatus(type),
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    });
+  }
 }
 
+/// メニュー内の各ステータスボタン。
+class _MenuItemButton extends StatelessWidget {
+  final UserStatusType type;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _MenuItemButton({
+    required this.type,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(30),
+      child: Container(
+        width: 60,
+        height: 60,
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.9),
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: type.color.withOpacity(0.5),
+              blurRadius: 8,
+              spreadRadius: 2,
+            ),
+          ],
+        ),
+        child: Center(
+          child: Text(type.emoji, style: const TextStyle(fontSize: 32)), // テキスト削除につきアイコンを大きく
+        ),
+      ),
+    );
+  }
+}
+
+/// 友達（他ユーザー）のステータスリストを表示するセクション。
 class _FriendListSection extends StatelessWidget {
-  const _FriendListSection();
+  final Color textColor;
+  final Color subTextColor;
+
+  const _FriendListSection({required this.textColor, required this.subTextColor});
 
   @override
   Widget build(BuildContext context) {
     final friends = context.watch<StatusProvider>().friends;
 
-    if (friends.isEmpty) {
-      return const Center(child: Text('まだ誰もいません'));
+    // ソート処理
+    final sortedFriends = List.of(friends);
+    sortedFriends.sort((a, b) {
+      final aIsUnknown = a.status.isExpired || a.status.type == UserStatusType.unknown;
+      final bIsUnknown = b.status.isExpired || b.status.type == UserStatusType.unknown;
+
+      if (aIsUnknown && !bIsUnknown) return 1;
+      if (!aIsUnknown && bIsUnknown) return -1;
+      return b.status.updatedAt.compareTo(a.status.updatedAt);
+    });
+
+    if (sortedFriends.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.nights_stay_outlined, size: 48, color: subTextColor.withOpacity(0.3)),
+            const SizedBox(height: 16),
+            Text('まだ誰もいません', style: TextStyle(color: subTextColor.withOpacity(0.5))),
+          ],
+        ),
+      );
     }
 
     return ListView.builder(
-      itemCount: friends.length,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: sortedFriends.length,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       itemBuilder: (context, index) {
-        final friend = friends[index];
-        // Check if status is expired (older than 1 hour)
-        final isExpired = DateTime.now().difference(friend.status.updatedAt).inHours >= 1;
-        // If expired or explicitly unknown, treat as unknown
+        final friend = sortedFriends[index];
+        final isExpired = friend.status.isExpired;
+
         final displayStatusType = (isExpired || friend.status.type == UserStatusType.unknown)
             ? UserStatusType.unknown
             : friend.status.type;
         
         final isUnknown = displayStatusType == UserStatusType.unknown;
+        final statusColor = displayStatusType.color;
 
-        return Card(
-          color: Colors.grey[900],
-          margin: const EdgeInsets.only(bottom: 8),
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: isUnknown ? Colors.grey : Theme.of(context).colorScheme.secondary,
-              child: Text(friend.name[0]),
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            color: Colors.white.withOpacity(0.1), // 半透明ベース
+            border: Border.all(
+              color: isUnknown ? Colors.grey.withOpacity(0.2) : statusColor.withOpacity(0.5),
+              width: 1,
             ),
-            title: Text(friend.name),
+          ),
+          child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            leading: CircleAvatar(
+              backgroundColor: isUnknown ? Colors.grey.withOpacity(0.5) : statusColor,
+              foregroundColor: Colors.white,
+              child: Text(friend.name.isNotEmpty ? friend.name[0] : '?'),
+            ),
+            title: Text(
+              friend.name,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: textColor,
+              ),
+            ),
             subtitle: Text(
               isExpired ? '1時間以上前' : _formatTime(friend.status.updatedAt),
-              style: const TextStyle(fontSize: 12),
+              style: TextStyle(
+                fontSize: 12,
+                color: subTextColor,
+              ),
             ),
-            trailing: Text(
-              displayStatusType.emoji,
-              style: const TextStyle(fontSize: 32),
+            trailing: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.black12,
+                shape: BoxShape.circle,
+              ),
+              child: Text(
+                displayStatusType.emoji,
+                style: const TextStyle(fontSize: 28),
+              ),
             ),
           ),
         );
