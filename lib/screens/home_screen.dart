@@ -217,25 +217,21 @@ class _InteractiveStatusHeaderState extends State<_InteractiveStatusHeader>
               ),
             ),
 
-            // ステータスラベル（メニュー展開時は非表示）
+            // ステータスラベル（削除済みだが、タップ誘導のテキストは残すかどうか）
+            // ユーザー要望によりステータス名は削除。
+            // 誘導テキストのみフェード表示
             AnimatedOpacity(
               opacity: _isExpanded ? 0.0 : 1.0,
               duration: const Duration(milliseconds: 200),
               child: Column(
                 children: [
+                  const SizedBox(height: 8),
                   Text(
-                    currentType.label,
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: widget.textColor,
-                        ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'タップして変更',
+                    'Tap to change', // 英語または日本語でシンプルに
                     style: TextStyle(
                       fontSize: 12,
-                      color: widget.textColor.withOpacity(0.7),
+                      color: widget.textColor.withOpacity(0.5),
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ],
@@ -248,17 +244,11 @@ class _InteractiveStatusHeaderState extends State<_InteractiveStatusHeader>
   }
 
   List<Widget> _buildMenuItems(UserStatusType currentType) {
-    // 選択肢
-    final options = [
-      UserStatusType.awake,
-      UserStatusType.eating,
-      UserStatusType.free,
-      UserStatusType.busy,
-      UserStatusType.gaming,
-    ];
+    // 定義された選択可能なステータスを取得
+    final options = UserStatus.selectableStatuses;
 
     const double radius = 90.0;
-    // 5つのアイテムを円周上に配置 (-90度 = 上 からスタート)
+    // アイテムを円周上に配置 (-90度 = 上 からスタート)
     const double startAngle = -math.pi / 2;
     final double step = (2 * math.pi) / options.length;
 
@@ -323,16 +313,8 @@ class _MenuItemButton extends StatelessWidget {
             ),
           ],
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(type.emoji, style: const TextStyle(fontSize: 24)),
-            const SizedBox(height: 2),
-            Text(
-              type.label,
-              style: const TextStyle(fontSize: 8, color: Colors.black87, fontWeight: FontWeight.bold),
-            ),
-          ],
+        child: Center(
+          child: Text(type.emoji, style: const TextStyle(fontSize: 32)), // テキスト削除につきアイコンを大きく
         ),
       ),
     );

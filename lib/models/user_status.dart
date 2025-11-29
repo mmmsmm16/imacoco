@@ -41,6 +41,7 @@ extension UserStatusTypeExtension on UserStatusType {
   }
 
   /// ステータスに対応する日本語ラベルを取得します。
+  /// (UIからは削除されますが、ログやデバッグ、将来的なアクセシビリティ対応のために残します)
   String get label {
     switch (this) {
       case UserStatusType.awake:
@@ -56,6 +57,58 @@ extension UserStatusTypeExtension on UserStatusType {
       case UserStatusType.unknown:
       default:
         return '不明';
+      }
+  }
+
+  /// ステータスに対応するテーマカラーを取得します。
+  /// UIでの背景色やアクセントカラーとして使用します。
+  Color get color {
+    switch (this) {
+      case UserStatusType.awake:
+        return Colors.orangeAccent;
+      case UserStatusType.eating:
+        return Colors.lightGreen;
+      case UserStatusType.free:
+        return Colors.lightBlueAccent;
+      case UserStatusType.busy:
+        return Colors.redAccent;
+      case UserStatusType.gaming:
+        return Colors.purpleAccent;
+      case UserStatusType.unknown:
+      default:
+        return Colors.grey;
+    }
+  }
+
+  /// ステータスに対応する背景グラデーション色を取得します。
+  List<Color> get backgroundColors {
+    switch (this) {
+      case UserStatusType.awake:
+        return [const Color(0xFFFFF3E0), const Color(0xFFFFCC80)]; // 明るいオレンジ
+      case UserStatusType.eating:
+        return [const Color(0xFFF1F8E9), const Color(0xFFAED581)]; // 明るいグリーン
+      case UserStatusType.free:
+        return [const Color(0xFFE1F5FE), const Color(0xFF81D4FA)]; // 明るいブルー
+      case UserStatusType.busy:
+        return [const Color(0xFF3E0000), const Color(0xFF1A0000)]; // 深い赤（ダーク）
+      case UserStatusType.gaming:
+        return [const Color(0xFF311B92), const Color(0xFF000000)]; // 深い紫（ダーク）
+      case UserStatusType.unknown:
+      default:
+        return [const Color(0xFF1A1A2E), const Color(0xFF16213E)]; // デフォルトのダークブルー
+    }
+  }
+
+  /// 背景が明るい色かどうかを判定します。
+  /// テキスト色を黒にするか白にするかの判定に使用します。
+  bool get isLightBackground {
+    switch (this) {
+      case UserStatusType.awake:
+      case UserStatusType.eating:
+      case UserStatusType.free:
+        return true;
+      default:
+        return false;
     }
   }
 
@@ -125,6 +178,16 @@ class UserStatus {
 
   /// ステータスの有効期限（1時間）
   static const Duration expirationDuration = Duration(hours: 1);
+
+  /// UIで選択可能なステータスのリスト。
+  /// 将来的にアイコンを増やしたい場合はここに追加する。
+  static const List<UserStatusType> selectableStatuses = [
+    UserStatusType.awake,
+    UserStatusType.eating,
+    UserStatusType.free,
+    UserStatusType.busy,
+    UserStatusType.gaming,
+  ];
 
   /// [UserStatus] のコンストラクタ。
   ///
